@@ -244,4 +244,10 @@ export type AuditAction =
   // de código próprio para não somar duas grandezas no mesmo relatório.
   | "followup.scheduled"
   | "followup.cancelled"
-  | "lead.reactivation_proposed";
+  | "lead.reactivation_proposed"
+  // Um LOTE de encaminhamento, não uma mensagem: a linha guarda quantas saíram e
+  // de quais origens. Cada mensagem criada no destino já gera seu `message.sent`,
+  // então repetir por item somaria a mesma coisa duas vezes no relatório — e o
+  // que o forward acrescenta como fato auditável é o repasse de conteúdo de uma
+  // conversa para outra, que é uma decisão só.
+  | "message.forwarded";

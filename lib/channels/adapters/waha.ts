@@ -8,7 +8,7 @@
 import { fetchWahaMedia } from "@/lib/messaging/media/waha-source";
 import { getWahaClient } from "@/lib/waha/client";
 import { wahaSendPlanFor } from "@/lib/waha/media-send";
-import { bareWaMessageId, parseWahaMessageId } from "@/lib/waha/message-id";
+import { bareWaMessageId, parseWahaMessageId, wahaForwardableId } from "@/lib/waha/message-id";
 import { resolveWahaChatId } from "@/lib/waha/send";
 import type { FetchedMedia } from "@/lib/messaging/media/types";
 import type { ChannelAdapter, ChannelHealth, OutboundEnvelope, RecipientInput } from "../types";
@@ -124,6 +124,35 @@ export const wahaAdapter: ChannelAdapter = {
     // mesmo tipo dos dois lados, e reconstruí-lo faria a próxima adição de
     // campo sumir em silêncio aqui no meio.
     return fetchWahaMedia(input.url, input.hintMime ?? null);
+  },
+
+  /**
+   * Encaminha uma mensagem já existente da sessão.
+   *
+   * Duas linhas de tradução, e nenhuma regra de negócio: normalizar o id para a
+   * forma composta (ver `wahaForwardableId` — é o que faz mensagem NOSSA em
+   * NOWEB poder ser encaminhada) e ler o id da mensagem nova pelo mesmo parser
+   * do envio comum.
+   *
+   * Sem env de WAHA o desfecho é NOOP, e não erro — o mesmo contrato de `send`,
+   * pelo mesmo motivo: quem chama distingue "não tentei" de "tentei e não veio
+   * id" pelo `isConfigured`, não por exceção.
+   */
+  async forwardMessage(input: {
+    sessionRef: string;
+    to: string;
+    externalId: string;
+    recipientOfOrigin?: string | null;
+  }): Promise<{ externalId: string | null }> {
+    const client = getWahaClient();
+    if (!client) return { externalId: null };
+
+    const res = await client.forwardMessage(
+      input.sessionRef,
+      input.to,
+      wahaForwardableId(input.externalId, input.recipientOfOrigin),
+    );
+    return { externalId: parseWahaMessageId(res) };
   },
 
   async send(envelope: OutboundEnvelope): Promise<{ externalId: string | null }> {

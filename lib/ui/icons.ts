@@ -112,4 +112,10 @@ export {
   Key,
   UserCircle,
   ClockCounterClockwise,
+  // encaminhamento de mensagem — a seta curvada é o desenho que o próprio
+  // aplicativo de mensagem usa para esta ação, então ela chega à tela já
+  // significando "encaminhar" sem precisar de rótulo ao lado.
+  ArrowBendUpRight,
+  // seleção múltipla de mensagens (o marcado usa o CheckCircle já exportado acima)
+  Circle,
 } from "@phosphor-icons/react/dist/ssr";

@@ -69,6 +69,40 @@ export const sendMessageSchema = z
 
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;
 
+/**
+ * Teto de mensagens por encaminhamento.
+ *
+ * Dois motivos independentes, e o menor dos dois é que manda:
+ *
+ *  1. **Anti-ban.** Encaminhar em lote é o primeiro caminho MANUAL que dispara
+ *     várias mensagens de um clique só — sem alguém digitando entre uma e outra,
+ *     o ritmo natural que protege o envio comum desaparece. O handler espaça com
+ *     jitter, e o teto limita o tamanho da rajada possível.
+ *  2. **A requisição precisa caber.** O espaçamento roda dentro do request; teto
+ *     alto demais bate no timeout do proxy e o operador vê erro numa operação que
+ *     na verdade estava indo bem.
+ *
+ * 10 cobre o caso real que motivou a função (repassar o álbum de fotos de um
+ * item para outro interessado) e mantém o pior caso em poucos segundos.
+ */
+export const FORWARD_MAX_BATCH = 10;
+
+/**
+ * Encaminhamento — sempre em lote, mesmo quando é uma mensagem só.
+ *
+ * Uma rota coletiva em vez de uma por mensagem porque o espaçamento anti-ban
+ * precisa acontecer no SERVIDOR: se a tela disparasse N requisições, a trava
+ * moraria no cliente, e trava que mora no cliente é trava que o próximo
+ * chamador (um script, o MCP, um retry) não tem.
+ */
+export const forwardMessagesSchema = z.object({
+  /** Na ordem em que o chamador quiser; o handler reordena cronologicamente. */
+  message_ids: z.array(z.string().uuid()).min(1).max(FORWARD_MAX_BATCH),
+  target_conversation_id: z.string().uuid(),
+});
+
+export type ForwardMessagesInput = z.infer<typeof forwardMessagesSchema>;
+
 export const claimConversationSchema = z.object({
   expected_assignee: z.string().uuid().nullable().optional(),
 });

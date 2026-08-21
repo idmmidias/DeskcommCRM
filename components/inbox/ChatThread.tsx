@@ -1,17 +1,22 @@
 "use client";
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MessageBubble } from "./MessageBubble";
 import { NoteCard } from "./NoteCard";
+import { ForwardDialog } from "./ForwardDialog";
 import { useMessagesRealtime } from "@/hooks/inbox/useMessagesRealtime";
 import { useConversationNotes } from "@/hooks/inbox/useConversationNotes";
 import { useDeleteNote } from "@/hooks/inbox/useDeleteNote";
+import { useChannelCapabilities } from "@/hooks/inbox/useChannelCapabilities";
 import { useDebugToggle } from "@/hooks/ai/useDebugToggle";
 import { useActiveOrg, useUser } from "@/hooks/auth/AuthProvider";
 import { ROLE_RANK } from "@/lib/auth/types";
+import { FORWARD_MAX_BATCH } from "@/lib/schemas";
+import { ArrowBendUpRight, X } from "@/lib/ui/icons";
 import type { Message, Note } from "@/lib/types/messaging";
 
 interface Props {
@@ -52,6 +57,72 @@ export function ChatThread({ conversationId }: Props) {
   const deleteNote = useDeleteNote(conversationId ?? "");
   const canManage = activeOrg != null && ROLE_RANK[activeOrg.role] >= ROLE_RANK.manager;
   const { enabled: debugCitations } = useDebugToggle(activeOrg?.role ?? null);
+
+  // ── Encaminhamento ─────────────────────────────────────────────────────────
+  // A tela pergunta o que o canal PERMITE, nunca qual canal é (doutrina de
+  // restrição de canal, invariante 1). Enquanto a resposta não chega, a ação não
+  // aparece — melhor um botão que surge um instante depois do que um que some
+  // na cara de quem já ia clicar.
+  const caps = useChannelCapabilities(conversationId);
+  const canForward = caps.data?.can_forward ?? false;
+
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selecionadas, setSelecionadas] = useState<string[]>([]);
+  const [forwardAberto, setForwardAberto] = useState(false);
+  // Encaminhar UMA mensagem pelo atalho de hover não passa pela seleção: o alvo
+  // vai direto para o diálogo e a thread continua como estava.
+  const [alvoAvulso, setAlvoAvulso] = useState<string | null>(null);
+
+  const sairDaSelecao = useCallback(() => {
+    setSelectionMode(false);
+    setSelecionadas([]);
+  }, []);
+
+  // Conversa nova zera a seleção: manter ids de outra thread faria o diálogo
+  // encaminhar mensagem que não está mais na tela.
+  //
+  // Ajustado DURANTE o render, não por efeito. É o padrão que o próprio React
+  // recomenda para "resetar estado quando uma prop muda": por efeito, a thread
+  // chega a pintar uma vez com a seleção da conversa ANTERIOR sobre as mensagens
+  // da nova — e é essa passada intermediária que faria a barra anunciar
+  // "3 selecionadas" numa conversa onde nada está selecionado.
+  const [convAnterior, setConvAnterior] = useState(conversationId);
+  if (conversationId !== convAnterior) {
+    setConvAnterior(conversationId);
+    setSelectionMode(false);
+    setSelecionadas([]);
+    setAlvoAvulso(null);
+    setForwardAberto(false);
+  }
+
+  // Esc sai do modo seleção — mas não enquanto o diálogo está aberto, senão a
+  // mesma tecla fecharia os dois de uma vez e a escolha do destino se perderia.
+  useEffect(() => {
+    if (!selectionMode || forwardAberto) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") sairDaSelecao();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectionMode, forwardAberto, sairDaSelecao]);
+
+  const alternarSelecao = useCallback((id: string) => {
+    setSelecionadas((atual) => {
+      if (atual.includes(id)) return atual.filter((x) => x !== id);
+      if (atual.length >= FORWARD_MAX_BATCH) {
+        // Barrar aqui, e não no envio: o teto existe para limitar a rajada, e
+        // descobri-lo só depois de escolher o destino desperdiçaria o trabalho
+        // de quem selecionou.
+        toast.warning(`Dá para encaminhar até ${FORWARD_MAX_BATCH} mensagens por vez.`);
+        return atual;
+      }
+      return [...atual, id];
+    });
+  }, []);
+
+  // O que o diálogo recebe: o avulso quando veio do hover, a seleção quando veio
+  // da barra. Uma fonte só evita os dois caminhos se contradizerem.
+  const idsParaEncaminhar = alvoAvulso ? [alvoAvulso] : selecionadas;
 
   const messages: Message[] = useMemo(
     () => q.data?.pages.flatMap((p) => p.data) ?? [],
@@ -149,6 +220,51 @@ export function ChatThread({ conversationId }: Props) {
 
   return (
     <div className="flex h-full flex-col">
+      {selectionMode && (
+        // Barra ACIMA da thread, não flutuando sobre ela: o que está selecionado
+        // fica visível junto com o que se pode fazer, e nada do histórico é
+        // encoberto no momento em que a pessoa está escolhendo.
+        <div className="flex items-center justify-between gap-2 border-b bg-muted/50 px-4 py-2">
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={sairDaSelecao}
+              aria-label="Sair do modo seleção"
+            >
+              <X size={16} aria-hidden />
+            </Button>
+            <span className="text-sm font-medium">
+              {selecionadas.length === 0
+                ? "Selecione as mensagens"
+                : `${selecionadas.length} selecionada${selecionadas.length > 1 ? "s" : ""}`}
+            </span>
+          </div>
+          <Button
+            size="sm"
+            disabled={selecionadas.length === 0}
+            onClick={() => {
+              setAlvoAvulso(null);
+              setForwardAberto(true);
+            }}
+          >
+            <ArrowBendUpRight size={16} className="mr-1.5" aria-hidden />
+            Encaminhar
+          </Button>
+        </div>
+      )}
+
+      <ForwardDialog
+        open={forwardAberto}
+        onOpenChange={(v) => {
+          setForwardAberto(v);
+          if (!v) setAlvoAvulso(null);
+        }}
+        messageIds={idsParaEncaminhar}
+        currentConversationId={conversationId}
+        onDone={sairDaSelecao}
+      />
+
       <div ref={scrollerRef} className="flex-1 overflow-y-auto py-2">
         {q.hasNextPage && (
           <div className="flex justify-center py-2">
@@ -188,6 +304,18 @@ export function ChatThread({ conversationId }: Props) {
                   key={`msg-${item.data.id}`}
                   message={item.data}
                   debugCitations={debugCitations}
+                  canForward={canForward}
+                  selectionMode={selectionMode}
+                  selected={selecionadas.includes(item.data.id)}
+                  onToggleSelect={() => alternarSelecao(item.data.id)}
+                  onForward={() => {
+                    setAlvoAvulso(item.data.id);
+                    setForwardAberto(true);
+                  }}
+                  onEnterSelection={() => {
+                    setSelectionMode(true);
+                    setSelecionadas([item.data.id]);
+                  }}
                 />
               ),
             )}
