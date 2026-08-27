@@ -336,6 +336,12 @@ export const AUDIT_ACTIONS = [
   // demais para a chamada seguinte do expurgo alcançar — a trilha registra
   // a própria erosão em vez de encolher sem deixar marca.
   "retention.sweep_run",
+  // Um LOTE de encaminhamento, não uma mensagem: a linha guarda quantas saíram e
+  // de quais origens. Cada mensagem criada no destino já gera seu `message.sent`,
+  // então repetir por item somaria a mesma coisa duas vezes no relatório — e o
+  // que o forward acrescenta como fato auditável é o repasse de conteúdo de uma
+  // conversa para outra, que é uma decisão só.
+  "message.forwarded",
 ] as const;
 
 /** Um código de auditoria. Derivado de `AUDIT_ACTIONS` — não redigite a lista. */

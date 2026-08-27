@@ -428,6 +428,32 @@ export class WahaClient {
     }
     return res.json();
   }
+
+  /**
+   * Encaminha uma mensagem existente da sessão para outro chat.
+   *
+   * `messageId` é o id DENTRO da sessão; o transporte resolve o conteúdo por ele,
+   * então texto e anexo vão sem re-upload e o destinatário recebe a mensagem
+   * marcada como encaminhada — que é justamente o que não dá para reproduzir
+   * enviando de novo.
+   *
+   * O corpo do erro entra na mensagem (como em `sendMedia`, e ao contrário de
+   * `sendMessage`) porque as recusas aqui são específicas e acionáveis — id que
+   * a sessão não conhece mais, chat inexistente. Um `waha_404` pelado mandaria
+   * quem lê procurar no lugar errado.
+   */
+  async forwardMessage(session: string, chatId: string, messageId: string): Promise<unknown> {
+    const res = await fetch(`${this.baseUrl}/api/forwardMessage`, {
+      method: "POST",
+      headers: { "X-Api-Key": this.apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ session, chatId, messageId }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`waha_${res.status}: ${body.slice(0, 200)}`);
+    }
+    return res.json();
+  }
 }
 
 /**
