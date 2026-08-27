@@ -901,6 +901,13 @@ export const AUDIT_ACTIONS = [
   // o dado que importa quando alguém pergunta "por que este cliente voltou a
   // receber?".
   "contact.unblocked",
+
+  // Um LOTE de encaminhamento, não uma mensagem: a linha guarda quantas saíram e
+  // de quais origens. Cada mensagem criada no destino já gera seu `message.sent`,
+  // então repetir por item somaria a mesma coisa duas vezes no relatório — e o
+  // que o forward acrescenta como fato auditável é o repasse de conteúdo de uma
+  // conversa para outra, que é uma decisão só.
+  "message.forwarded",
 ] as const;
 
 /** Um código de auditoria. Derivado de `AUDIT_ACTIONS` — não redigite a lista. */

@@ -92,7 +92,7 @@ type SB = SupabaseClient;
  * único lugar onde ela seria de fato a nossa mensagem, e impede de apagar linha
  * do próprio CRM.
  */
-async function removerEcoDoProprioEnvio(
+export async function removerEcoDoProprioEnvio(
   supabase: SB,
   organizationId: string,
   conversationId: string,
@@ -176,7 +176,10 @@ export function origemDaMensagem(actor: Actor): "user" | "ai" | "automation" | "
   return "ai";
 }
 
-const MSG_COLS =
+// Exportada porque o handler do encaminhamento (`_forward-handler.ts`) monta a
+// linha do destino com as MESMAS colunas: duplicar a lista ali faria a próxima
+// coluna nova entrar num lugar e faltar no outro, sem erro de compilação.
+export const MSG_COLS =
   "id, organization_id, conversation_id, channel_session_id, contact_id, external_id, type, direction, status, ack, error_code, error_message, body, media_url, media_mime, media_size_bytes, media_storage_path, sent_via, sent_by_user_id, sent_on_behalf_of_user_id, sent_at, delivered_at, read_at, metadata, edited_at, revoked_at, reply_to_message_id, created_at";
 
 /**
@@ -330,7 +333,7 @@ export async function listMessagesHandler(
 // send
 // ---------------------------------------------------------------------------
 
-function previewFrom(input: {
+export function previewFrom(input: {
   body?: string;
   media_url?: string;
   media_storage_path?: string;

@@ -35,6 +35,9 @@ describe("capabilities do canal intermediado", () => {
       groups: "limited",
       costPerMessage: true,
       alteraMensagemEnviada: false,
+      // Herdado do canal oficial pela mesma razão de tudo aqui: não existe
+      // primitiva de encaminhamento por baixo para o intermediário repassar.
+      canForward: false,
     });
   });
 
