@@ -22,6 +22,9 @@ export const CHANNEL_CAPABILITIES: Record<ChannelProvider, ChannelCapabilities> 
     voiceNote: "server-convert",
     groups: "full",
     costPerMessage: false,
+    // A sessão é a do próprio aplicativo, então ela tem as mesmas primitivas que
+    // o aplicativo tem — e encaminhar é uma delas.
+    canForward: true,
   },
   // Hetero-restrição: não me banem, mas a Meta me proíbe e me cobra.
   meta_cloud: {
@@ -35,6 +38,13 @@ export const CHANNEL_CAPABILITIES: Record<ChannelProvider, ChannelCapabilities> 
     voiceNote: "opus-only",
     groups: "limited",
     costPerMessage: true,
+    // A API oficial NÃO expõe encaminhamento — não é lacuna de implementação
+    // nossa, é ausência de primitiva na plataforma. O mais perto que se chega é
+    // reenviar o `media_id` como mensagem nova: sem marcação de encaminhada,
+    // dentro da janela de 24h e cobrada como qualquer outra. Como isso não é a
+    // mesma operação, a resposta honesta aqui é `false` — declarar `true` faria
+    // a tela oferecer uma ação que o canal não sabe cumprir.
+    canForward: false,
   },
   // Mesma hetero-restrição do canal oficial, por baixo: é um BSP: a WABA é da
   // Meta, os templates são aprovados pela Meta e a janela de 24h é da Meta. O
@@ -68,6 +78,10 @@ export const CHANNEL_CAPABILITIES: Record<ChannelProvider, ChannelCapabilities> 
     voiceNote: "opus-only",
     groups: "limited",
     costPerMessage: true,
+    // Pelo mesmo motivo do canal oficial, e pela mesma razão de sempre neste
+    // bloco: o intermediário muda o transporte, não o que o WhatsApp permite.
+    // Não há primitiva de forward por baixo para ele intermediar.
+    canForward: false,
   },
 };
 

@@ -63,3 +63,36 @@ export function chatIdFromWaMessageId(id: string): string | null {
   const chat = id.slice(first + 1, last);
   return chat.includes('@') ? chat : null;
 }
+
+/**
+ * O id na forma que o ENCAMINHAMENTO aceita — composta, `{fromMe}_{chatId}_{bare}`.
+ *
+ * ─── Por que não basta passar o `external_id` como está ─────────────────────
+ *
+ * Encaminhar pede a mensagem de ORIGEM, e o canal só a localiza pelo id que
+ * carrega o chat onde ela vive. O bare sozinho não diz em qual conversa
+ * procurar, e a assimetria descrita em `bareWaMessageId` faz com que metade das
+ * mensagens do banco esteja gravada exatamente assim:
+ *
+ *   inbound (veio do webhook)          → composto  → encaminha
+ *   outbound no WEBJS (`_serialized`)  → composto  → encaminha
+ *   outbound no NOWEB (id cru)         → BARE      → não encaminha
+ *
+ * A terceira linha não é caso de borda: num engine NOWEB ela é toda mensagem que
+ * o próprio atendente mandou — justamente as que mais se quer repassar (o
+ * catálogo que ele enviou, o orçamento que ele montou). Sem remontar, a função
+ * nasceria funcionando só para o que o cliente escreveu.
+ *
+ * `fromMe` é `true` porque o bare só aparece na RESPOSTA DE ENVIO: se o id veio
+ * sem chat, ele é de mensagem nossa. Inbound chega pelo webhook e já vem composto,
+ * caindo no primeiro ramo.
+ *
+ * Devolve o id intacto quando já está composto (nada a remontar) e também quando
+ * não há chat de origem conhecido — aí não há o que inventar, e é melhor deixar o
+ * canal recusar com o erro dele do que fabricar uma referência inválida.
+ */
+export function wahaForwardableId(externalId: string, chatIdOfOrigin?: string | null): string {
+  if (chatIdFromWaMessageId(externalId)) return externalId;
+  if (!chatIdOfOrigin) return externalId;
+  return `true_${chatIdOfOrigin}_${bareWaMessageId(externalId)}`;
+}
