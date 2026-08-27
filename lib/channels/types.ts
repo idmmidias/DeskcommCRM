@@ -37,6 +37,22 @@ export interface ChannelCapabilities {
   groups: "full" | "limited" | "none";
   /** Mensagem entregue gera custo → decisões de envio precisam considerar orçamento. */
   costPerMessage: boolean;
+  /**
+   * O canal sabe ENCAMINHAR uma mensagem que já existe — o "Encaminhar" do app,
+   * que repassa o anexo sem re-upload e marca a mensagem como encaminhada para
+   * quem recebe.
+   *
+   * Não é açúcar sobre "enviar de novo", e é por isso que merece capability
+   * própria: reenviar baixa e sobe o arquivo outra vez (a mídia vira OUTRA
+   * mensagem, sem marcação, e o custo/tempo é de um upload inteiro), enquanto
+   * encaminhar referencia a mensagem original dentro da sessão. Um canal ou tem
+   * a primitiva ou não tem — não dá para emular.
+   *
+   * Quem consome: a tela do inbox, para decidir se oferece a ação. Ela não pode
+   * perguntar QUAL canal é (invariante 1), e não tem adapter em mãos para testar
+   * a presença de `forwardMessage` — então pergunta isto.
+   */
+  canForward: boolean;
 }
 
 /**
@@ -303,6 +319,35 @@ export interface ChannelAdapter {
     language: string;
     /** Valores dos `{{n}}`, na ordem em que a definição os declara. */
     values: Record<string, string>;
+  }): Promise<{ externalId: string | null }>;
+
+  /**
+   * Encaminha uma mensagem que JÁ EXISTE na sessão para outro destinatário.
+   *
+   * OPCIONAL como os demais: canal sem a primitiva não implementa, e quem chama
+   * testa a presença em vez de perguntar QUAL provider é. A capability
+   * `canForward` responde a mesma pergunta de forma declarativa, para quem
+   * precisa decidir ANTES de ter um adapter em mãos (uma tela, por exemplo).
+   *
+   * `externalId` é o id da mensagem de origem COMO O CRM O GRAVOU — e isso não
+   * é necessariamente a forma que o canal aceita de volta. Normalizar entre as
+   * formas é conhecimento do canal, não de quem encaminha: o mesmo motivo pelo
+   * qual `echoExternalIds` existe. Quem chama passa o que tem em
+   * `messages.external_id` e o adapter se vira.
+   *
+   * `recipientOfOrigin` é o endereço do OUTRO lado da conversa de origem, e vem
+   * junto porque em alguns engines o id gravado não carrega o chat — sem ele não
+   * há como remontar a referência. `null` quando não se sabe; o adapter então
+   * tenta com o que tem, e o canal recusa se não bastar.
+   *
+   * Devolve o id da mensagem NOVA (a encaminhada), no mesmo contrato de `send`:
+   * `null` = canal não configurado (noop) ou resposta sem id reconhecível.
+   */
+  forwardMessage?(input: {
+    sessionRef: string;
+    to: string;
+    externalId: string;
+    recipientOfOrigin?: string | null;
   }): Promise<{ externalId: string | null }>;
 }
 

@@ -3,7 +3,16 @@
 import { useLocaleDeData } from "@/hooks/i18n/useLocaleDeData";
 import { format } from "date-fns";
 import { useT } from "@/hooks/i18n/useT";
-import { ArrowBendUpLeft, Check, Checks, Robot, WarningOctagon } from "@/lib/ui/icons";
+import {
+  ArrowBendUpLeft,
+  ArrowBendUpRight,
+  Check,
+  Checks,
+  CheckCircle,
+  Circle,
+  Robot,
+  WarningOctagon,
+} from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Message } from "@/lib/types/messaging";
@@ -22,6 +31,16 @@ interface Props {
   onResponder?: (m: Message) => void;
   /** A mensagem citada por ESTA, quando houver — desenha o fio. */
   citada?: Message | null;
+  /** O canal desta conversa encaminha? Falso esconde a ação — não a mostra quebrada. */
+  canForward?: boolean;
+  /** Modo seleção ligado: a bolha inteira vira alvo de clique. */
+  selectionMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
+  /** Encaminhar só esta mensagem (atalho de hover, sem entrar no modo seleção). */
+  onForward?: () => void;
+  /** Liga o modo seleção já marcando esta mensagem. */
+  onEnterSelection?: () => void;
 }
 
 function AckIndicator({ status, t }: { status: string; t: (texto: string) => string }) {
@@ -37,7 +56,18 @@ function AckIndicator({ status, t }: { status: string; t: (texto: string) => str
   return null;
 }
 
-export function MessageBubble({ message, debugCitations, onResponder, citada }: Props) {
+export function MessageBubble({
+  message,
+  debugCitations,
+  onResponder,
+  citada,
+  canForward,
+  selectionMode,
+  selected,
+  onToggleSelect,
+  onForward,
+  onEnterSelection,
+}: Props) {
   const localeDaData = useLocaleDeData();
   const t = useT();
   const isOutbound = message.direction === "outbound";
@@ -63,48 +93,120 @@ export function MessageBubble({ message, debugCitations, onResponder, citada }: 
     return null;
   })();
 
+  // Esta mensagem CHEGOU a existir no canal? Sem `external_id` não há o que
+  // referenciar, e o servidor recusaria. Descobrir isso aqui evita oferecer uma
+  // ação que só falharia depois de escolhido o destino — e apagada não se
+  // encaminha porque o conteúdo já não existe mais nem para quem a recebeu.
+  const encaminhavel = Boolean(canForward) && Boolean(message.external_id) && !apagada;
+
+  // A marca vem do metadado gravado no encaminhamento; a bolha não sabe (nem
+  // precisa saber) de onde veio, só que veio de outra conversa.
+  const foiEncaminhada = Boolean(
+    (message.metadata as Record<string, unknown> | null | undefined)?.forwarded_from,
+  );
+
+  // Aparece no hover no ponteiro, mas o foco por teclado também revela — senão a
+  // ação existiria só para quem usa mouse.
+  //
+  // VISÍVEL POR PADRÃO, escondida só onde EXISTE hover. A regra chegou com o
+  // botão Responder da v1.6.0 e passou a valer para a barra inteira: `opacity-0`
+  // + `group-hover` deixa o botão invisível para sempre no celular (não há como
+  // passar o mouse, e `focus-visible` só chega por teclado), ou seja, a ação
+  // sumia justamente onde esta equipe mais atende. `@media (hover: hover)`
+  // pergunta pelo DISPOSITIVO, não pela largura — tablet de toque continua
+  // mostrando, desktop estreito continua escondendo.
+  const classeAcao = cn(
+    "shrink-0 rounded-full p-1.5 text-muted-foreground transition-opacity hover:bg-accent hover:text-foreground",
+    "opacity-100 [@media(hover:hover)]:opacity-0",
+    "[@media(hover:hover)]:group-hover:opacity-100 focus-visible:opacity-100",
+  );
+
+  // Responder (v1.6.0) e encaminhar/selecionar (patch da IDM) nasceram disputando
+  // o MESMO canto da bolha, cada um com a sua regra de visibilidade. Viram uma
+  // barra só: são todas ações sobre esta mensagem, e dois grupos flutuantes
+  // brigariam pelo espaço no hover.
+  const temAcaoDeMensagem = Boolean(onResponder) || encaminhavel;
+
+  const acoesDeHover =
+    temAcaoDeMensagem && !selectionMode ? (
+      <span className="flex shrink-0 items-center">
+        {onResponder && (
+          <button
+            type="button"
+            onClick={() => onResponder(message)}
+            aria-label={t("Responder a esta mensagem")}
+            title="Responder"
+            className={classeAcao}
+          >
+            <ArrowBendUpLeft size={16} aria-hidden />
+          </button>
+        )}
+        {encaminhavel && onForward && (
+          <button
+            type="button"
+            onClick={onForward}
+            aria-label="Encaminhar mensagem"
+            title="Encaminhar"
+            className={classeAcao}
+          >
+            <ArrowBendUpRight size={16} aria-hidden />
+          </button>
+        )}
+        {encaminhavel && onEnterSelection && (
+          // Existe separado do encaminhar porque são duas intenções diferentes:
+          // "esta aqui" e "esta e mais algumas". Fundir as duas obrigaria quem
+          // quer uma só a passar pelo modo seleção, que é o caminho mais longo
+          // para o caso mais comum.
+          <button
+            type="button"
+            onClick={onEnterSelection}
+            aria-label="Selecionar mensagens"
+            title="Selecionar mensagens"
+            className={classeAcao}
+          >
+            <CheckCircle size={16} aria-hidden />
+          </button>
+        )}
+      </span>
+    ) : null;
+
   return (
     <div
       className={cn(
         "group flex w-full items-center gap-1 px-4 py-1",
         isOutbound ? "justify-end" : "justify-start",
+        selectionMode && "cursor-pointer",
+        selected && "bg-accent/40",
       )}
+      onClick={selectionMode ? onToggleSelect : undefined}
+      // No modo seleção a linha inteira é o controle. Fora dele não é clicável,
+      // e anunciar um `role` que não faz nada confundiria o leitor de tela.
+      role={selectionMode ? "checkbox" : undefined}
+      aria-checked={selectionMode ? Boolean(selected) : undefined}
+      tabIndex={selectionMode ? 0 : undefined}
+      onKeyDown={
+        selectionMode
+          ? (e) => {
+              if (e.key === " " || e.key === "Enter") {
+                e.preventDefault();
+                onToggleSelect?.();
+              }
+            }
+          : undefined
+      }
     >
-      {/*
-        RESPONDER — aparece ao passar o mouse, como no WhatsApp Web.
-        Fica FORA da bolha para não disputar espaço com o texto, e do lado de
-        dentro da conversa (à esquerda no que sai, à direita no que entra), que
-        é onde a mão já está.
-
-        `opacity` e não `hidden`: esconder de verdade faria o layout pular
-        quando o mouse entra. Em telas de toque não há hover — por isso
-        `focus-visible` também revela, e o teclado alcança.
-      */}
-      {onResponder && isOutbound && (
-        <button
-          type="button"
-          onClick={() => onResponder(message)}
-          aria-label={t("Responder a esta mensagem")}
-          className={cn(
-            "rounded-md p-1 text-muted-foreground transition-opacity hover:bg-muted",
-            // VISÍVEL POR PADRÃO, e escondido só onde EXISTE hover.
-            //
-            // A primeira versão era `opacity-0` + `group-hover`, copiando o
-            // WhatsApp Web. No celular isso deixa o botão invisível para
-            // sempre: não há como passar o mouse, e `focus-visible` só chega
-            // por teclado. Ou seja, a função sumia exatamente onde o dono
-            // deste CRM mais atende.
-            //
-            // `@media (hover: hover)` pergunta pelo DISPOSITIVO, não pela
-            // largura: um tablet largo com toque continua mostrando, e um
-            // desktop estreito continua escondendo. Largura não é a pergunta.
-            "opacity-100 [@media(hover:hover)]:opacity-0",
-            "[@media(hover:hover)]:group-hover:opacity-100 focus-visible:opacity-100",
+      {selectionMode && (
+        <span className="shrink-0 pr-1 text-muted-foreground" aria-hidden>
+          {selected ? (
+            <CheckCircle size={20} weight="fill" className="text-primary" />
+          ) : (
+            <Circle size={20} />
           )}
-        >
-          <ArrowBendUpLeft size={14} />
-        </button>
+        </span>
       )}
+
+      {isOutbound && acoesDeHover}
+
       <div
         className={cn(
           "max-w-[75%] text-sm",
@@ -160,6 +262,16 @@ export function MessageBubble({ message, debugCitations, onResponder, citada }: 
               <Robot size={10} weight="duotone" aria-hidden />
             ) : null}
             {senderLabel && t(senderLabel)}
+          </div>
+        )}
+
+        {foiEncaminhada && !apagada && (
+          // Acima do conteúdo e em itálico, como no aplicativo: quem lê precisa
+          // saber que aquilo não foi escrito para esta conversa ANTES de ler o
+          // texto — depois já leu como se fosse.
+          <div className="mb-0.5 flex items-center gap-1 text-[11px] italic opacity-70">
+            <ArrowBendUpRight size={11} aria-hidden />
+            Encaminhada
           </div>
         )}
 
@@ -227,31 +339,8 @@ export function MessageBubble({ message, debugCitations, onResponder, citada }: 
           )}
         </div>
       </div>
-      {onResponder && !isOutbound && (
-        <button
-          type="button"
-          onClick={() => onResponder(message)}
-          aria-label={t("Responder a esta mensagem")}
-          className={cn(
-            "rounded-md p-1 text-muted-foreground transition-opacity hover:bg-muted",
-            // VISÍVEL POR PADRÃO, e escondido só onde EXISTE hover.
-            //
-            // A primeira versão era `opacity-0` + `group-hover`, copiando o
-            // WhatsApp Web. No celular isso deixa o botão invisível para
-            // sempre: não há como passar o mouse, e `focus-visible` só chega
-            // por teclado. Ou seja, a função sumia exatamente onde o dono
-            // deste CRM mais atende.
-            //
-            // `@media (hover: hover)` pergunta pelo DISPOSITIVO, não pela
-            // largura: um tablet largo com toque continua mostrando, e um
-            // desktop estreito continua escondendo. Largura não é a pergunta.
-            "opacity-100 [@media(hover:hover)]:opacity-0",
-            "[@media(hover:hover)]:group-hover:opacity-100 focus-visible:opacity-100",
-          )}
-        >
-          <ArrowBendUpLeft size={14} />
-        </button>
-      )}
+
+      {!isOutbound && acoesDeHover}
     </div>
   );
 }

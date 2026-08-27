@@ -23,6 +23,10 @@ import { describe, expect, it } from "vitest";
  *
  * ─── O que este teste NÃO prova, e por que ele é assim mesmo ───────────────
  *
+ * (Fork IDM: as ações da bolha foram fundidas numa barra só no rebase da
+ * v1.6.0 — a regra de visibilidade virou a constante `classeAcao`, e o teste
+ * dos 'dois botões' virou o teste do 'um lugar só'. Ver o `it` correspondente.)
+ *
  * Ele lê CLASSES, não comportamento — e classe presente não é botão alcançável.
  * A prova de verdade seria abrir um browser SEM hover, e o Playwright não sabe
  * emular isso: `emulateMedia` cobre `colorScheme`, `reducedMotion` e
@@ -52,14 +56,49 @@ describe("no celular o botão de responder aparece", () => {
     // `md:opacity-0` erraria o tablet com toque e o desktop estreito — e erraria
     // calado, que é o que torna esse tipo de bug caro.
     const trechos = [...BOLHA.matchAll(/(?:sm|md|lg|xl):opacity-0/g)];
-    expect(trechos.map((m) => m[0]), "largura não responde 'tem hover?'").toEqual([]);
+    expect(
+      trechos.map((m) => m[0]),
+      "largura não responde 'tem hover?'",
+    ).toEqual([]);
   });
 
-  it("os DOIS botões (entrada e saída) seguem a mesma regra", () => {
-    // São dois elementos espelhados. Consertar um e esquecer o outro deixaria a
-    // metade da conversa sem resposta possível no celular.
+  it("a regra vive em UM lugar só — não há um segundo botão para esquecer", () => {
+    // ─── Por que este teste mudou de forma (fork IDM, rebase da v1.6.0) ──────
+    //
+    // No upstream eram dois elementos espelhados (entrada e saída), cada um com
+    // a sua string de classe, e este teste contava DUAS ocorrências: o medo era
+    // consertar um e esquecer o outro.
+    //
+    // Aqui as ações da bolha (responder, encaminhar, selecionar) foram fundidas
+    // numa barra só, `acoesDeHover`, renderizada nos dois lados. A classe passou
+    // a ser a constante `classeAcao`, aplicada por TODOS os botões. O modo de
+    // falha que o teste guardava deixou de ser possível por construção — não há
+    // "o outro botão", há uma constante.
+    //
+    // Então a asserção mudou de "conte dois" para "prove que é uma só": a classe
+    // aparece uma vez, dentro da constante, e nenhum botão escreve opacidade por
+    // conta própria. Voltar a espalhar a regra reprova aqui.
     const comRegra = [...BOLHA.matchAll(/\[@media\(hover:hover\)\]:opacity-0/g)];
-    expect(comRegra.length, "um dos dois botões ficou de fora").toBe(2);
+    expect(comRegra.length, "a regra de visibilidade se espalhou de novo").toBe(1);
+
+    expect(BOLHA, "a constante compartilhada sumiu").toMatch(
+      /const classeAcao = cn\(/,
+    );
+
+    // A regra de REVELAR NO HOVER (`opacity-0` / `group-hover:opacity-*`) só pode
+    // existir dentro da constante. Opacidade estática de outra coisa — a prévia
+    // da mensagem citada usa `opacity-70` — não é a mesma regra e não conta.
+    // Comentário citando a classe não é a classe. Sem tirar os comentários, a
+    // própria explicação de por que a regra existe reprovaria o teste.
+    const semComentarios = BOLHA.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+    const semAConstante = semComentarios.replace(/const classeAcao = cn\([\s\S]*?\);/, "");
+    const revelacaoSolta = [
+      ...semAConstante.matchAll(/(?:group-hover:opacity-|(?<![\w-])opacity-0(?![\w-]))/g),
+    ];
+    expect(
+      revelacaoSolta.map((m) => m[0]),
+      "a revelação por hover voltou a ser escrita fora da constante",
+    ).toEqual([]);
   });
 
   it("o teclado também alcança", () => {
