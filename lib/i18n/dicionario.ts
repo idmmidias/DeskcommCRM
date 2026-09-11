@@ -8129,6 +8129,29 @@ export const DICIONARIO: Traducoes = {
   "Este ponto usa o modelo definido na versão publicada do agente; a escolha do painel não se aplica.": {
     es: "Este punto usa el modelo definido en la versión publicada del agente; la elección del panel no se aplica.",
   },
+
+  // Encaminhamento de mensagens (fork IDM, patch sobre a v1.17.0). "Reenviar" é o
+  // termo que o WhatsApp usa em espanhol para a mesma ação.
+  "Encaminhar mensagem": { es: "Reenviar mensaje" },
+  "Encaminhar": { es: "Reenviar" },
+  "A mensagem chega marcada como encaminhada, igual ao aplicativo.": { es: "El mensaje llega marcado como reenviado, igual que en la aplicación." },
+  "O envio é espaçado, então leva alguns segundos.": { es: "El envío es espaciado, así que tarda unos segundos." },
+  "Buscar conversa por nome ou telefone": { es: "Buscar conversación por nombre o teléfono" },
+  "Buscar conversa de destino": { es: "Buscar conversación de destino" },
+  "Nenhuma outra conversa disponível.": { es: "No hay otra conversación disponible." },
+  "Encaminhando…": { es: "Reenviando…" },
+  "Dá para encaminhar até": { es: "Se pueden reenviar hasta" },
+  "mensagens por vez.": { es: "mensajes por vez." },
+  "Sair do modo seleção": { es: "Salir del modo selección" },
+  "Selecione as mensagens": { es: "Selecciona los mensajes" },
+  "selecionada": { es: "seleccionado" },
+  "selecionadas": { es: "seleccionados" },
+  "Selecionar mensagens": { es: "Seleccionar mensajes" },
+  "Encaminhada": { es: "Reenviado" },
+  "Mensagem encaminhada.": { es: "Mensaje reenviado." },
+  "mensagens encaminhadas.": { es: "mensajes reenviados." },
+  "1 mensagem não pôde ser encaminhada.": { es: "1 mensaje no pudo ser reenviado." },
+  "mensagens não puderam ser encaminhadas.": { es: "mensajes no pudieron ser reenviados." },
 };
 
 /**

@@ -121,12 +121,12 @@ export function ChatThread({ conversationId, onResponder }: Props) {
         // Barrar aqui, e não no envio: o teto existe para limitar a rajada, e
         // descobri-lo só depois de escolher o destino desperdiçaria o trabalho
         // de quem selecionou.
-        toast.warning(`Dá para encaminhar até ${FORWARD_MAX_BATCH} mensagens por vez.`);
+        toast.warning(`${t("Dá para encaminhar até")} ${FORWARD_MAX_BATCH} ${t("mensagens por vez.")}`);
         return atual;
       }
       return [...atual, id];
     });
-  }, []);
+  }, [t]);
 
   // O que o diálogo recebe: o avulso quando veio do hover, a seleção quando veio
   // da barra. Uma fonte só evita os dois caminhos se contradizerem.
@@ -283,14 +283,14 @@ export function ChatThread({ conversationId, onResponder }: Props) {
               size="sm"
               variant="ghost"
               onClick={sairDaSelecao}
-              aria-label="Sair do modo seleção"
+              aria-label={t("Sair do modo seleção")}
             >
               <X size={16} aria-hidden />
             </Button>
             <span className="text-sm font-medium">
               {selecionadas.length === 0
-                ? "Selecione as mensagens"
-                : `${selecionadas.length} selecionada${selecionadas.length > 1 ? "s" : ""}`}
+                ? t("Selecione as mensagens")
+                : `${selecionadas.length} ${selecionadas.length > 1 ? t("selecionadas") : t("selecionada")}`}
             </span>
           </div>
           <Button
@@ -302,7 +302,7 @@ export function ChatThread({ conversationId, onResponder }: Props) {
             }}
           >
             <ArrowBendUpRight size={16} className="mr-1.5" aria-hidden />
-            Encaminhar
+            {t("Encaminhar")}
           </Button>
         </div>
       )}

@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { apiClient } from "@/lib/api/client";
 import { showApiError } from "@/components/feedback/ApiErrorToast";
 import type { Message } from "@/lib/types/messaging";
+import { useT } from "@/hooks/i18n/useT";
 
 interface ForwardArgs {
   message_ids: string[];
@@ -33,6 +34,7 @@ interface ForwardResponse {
  */
 export function useForwardMessages() {
   const qc = useQueryClient();
+  const t = useT();
 
   return useMutation({
     mutationFn: async (args: ForwardArgs) =>
@@ -55,18 +57,18 @@ export function useForwardMessages() {
       // chegou a ser tentado.
       if (enviadas > 0) {
         toast.success(
-          enviadas === 1 ? "Mensagem encaminhada." : `${enviadas} mensagens encaminhadas.`,
+          enviadas === 1 ? t("Mensagem encaminhada.") : `${enviadas} ${t("mensagens encaminhadas.")}`,
         );
       }
       if (falharam > 0) {
         toast.error(
           falharam === 1
-            ? "1 mensagem não pôde ser encaminhada."
-            : `${falharam} mensagens não puderam ser encaminhadas.`,
+            ? t("1 mensagem não pôde ser encaminhada.")
+            : `${falharam} ${t("mensagens não puderam ser encaminhadas.")}`,
         );
       }
       for (const r of rejected) {
-        toast.warning(r.message);
+        toast.warning(t(r.message));
       }
     },
   });

@@ -135,7 +135,7 @@ export function MessageBubble({
             type="button"
             onClick={() => onResponder(message)}
             aria-label={t("Responder a esta mensagem")}
-            title="Responder"
+            title={t("Responder")}
             className={classeAcao}
           >
             <ArrowBendUpLeft size={16} aria-hidden />
@@ -145,8 +145,8 @@ export function MessageBubble({
           <button
             type="button"
             onClick={onForward}
-            aria-label="Encaminhar mensagem"
-            title="Encaminhar"
+            aria-label={t("Encaminhar mensagem")}
+            title={t("Encaminhar")}
             className={classeAcao}
           >
             <ArrowBendUpRight size={16} aria-hidden />
@@ -160,8 +160,8 @@ export function MessageBubble({
           <button
             type="button"
             onClick={onEnterSelection}
-            aria-label="Selecionar mensagens"
-            title="Selecionar mensagens"
+            aria-label={t("Selecionar mensagens")}
+            title={t("Selecionar mensagens")}
             className={classeAcao}
           >
             <CheckCircle size={16} aria-hidden />
@@ -271,7 +271,7 @@ export function MessageBubble({
           // texto — depois já leu como se fosse.
           <div className="mb-0.5 flex items-center gap-1 text-[11px] italic opacity-70">
             <ArrowBendUpRight size={11} aria-hidden />
-            Encaminhada
+            {t("Encaminhada")}
           </div>
         )}
 
