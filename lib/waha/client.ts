@@ -584,20 +584,36 @@ export class WahaClient {
    * marcada como encaminhada — que é justamente o que não dá para reproduzir
    * enviando de novo.
    *
-   * O corpo do erro entra na mensagem (como em `sendMedia`, e ao contrário de
-   * `sendMessage`) porque as recusas aqui são específicas e acionáveis — id que
-   * a sessão não conhece mais, chat inexistente. Um `waha_404` pelado mandaria
-   * quem lê procurar no lugar errado.
+   * O corpo do erro NÃO entra na exceção (política deste arquivo, ver o
+   * cabeçalho: ele pode carregar conteúdo de conversa). A recusa mais comum, e a
+   * mais enganosa, é reconhecida pelo envelope e vira um texto FIXO nosso: o
+   * WAHA responde 422 "Message with id '...' not found" quando a mensagem não
+   * está no histórico da sessão (no NOWEB, store desligado ou mensagem anterior
+   * à ativação dele). Sem essa tradução, um `waha_forward_422` pelado mandaria
+   * quem lê procurar defeito no CRM, e o conserto é no canal.
    */
   async forwardMessage(session: string, chatId: string, messageId: string): Promise<unknown> {
-    const res = await fetch(`${this.baseUrl}/api/forwardMessage`, {
+    const res = await this.fetchComTeto(`${this.baseUrl}/api/forwardMessage`, {
       method: "POST",
       headers: { "X-Api-Key": this.apiKey, "Content-Type": "application/json" },
       body: JSON.stringify({ session, chatId, messageId }),
     });
     if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(`waha_${res.status}: ${body.slice(0, 200)}`);
+      // O corpo é LIDO para reconhecer o caso, nunca repassado.
+      const recusa = await res.text().catch(() => "");
+      let motivo = recusa;
+      try {
+        const env = errorEnvelope.safeParse(JSON.parse(recusa));
+        if (env.success) motivo = env.data.message;
+      } catch {
+        // corpo que não é JSON: a regex abaixo olha o texto cru
+      }
+      if (res.status === 422 && /Message with id .+ not found/i.test(motivo)) {
+        throw new Error(
+          "waha_forward_422: a mensagem não está no histórico do canal (store do NOWEB desligado ou mensagem anterior à ativação)",
+        );
+      }
+      throw new Error(`waha_forward_${res.status}`);
     }
     return res.json();
   }
