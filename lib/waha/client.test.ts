@@ -243,6 +243,7 @@ describe("o corpo devolvido pelo WAHA nunca entra na exceção", () => {
       "sendMedia",
       (c) => c.sendMedia("sessao", "5511999@c.us", { endpoint: "sendImage", payload: {} }),
     ],
+    ["forwardMessage", (c) => c.forwardMessage("sessao", "5511999@c.us", "true_5511999@c.us_ABC")],
   ];
 
   it.each(CHAMADAS)("⭐ %s: a mensagem não carrega nada do corpo do WAHA", async (_nome, fn) => {

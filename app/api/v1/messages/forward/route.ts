@@ -7,6 +7,7 @@
  * mensagem, a tela faria N chamadas e a trava moraria no cliente — onde o
  * próximo chamador não a herda.
  */
+import { requireSupportWrite } from "@/lib/impersonate/support";
 import { randomUUID } from "node:crypto";
 import { type NextRequest } from "next/server";
 
@@ -21,6 +22,11 @@ import { forwardMessagesHandler } from "../_forward-handler";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest): Promise<Response> {
+  // Modo suporte é leitura: quem entra na organização para ajudar não encaminha
+  // conversa de cliente em nome dela. Mesma guarda do envio comum.
+  const supportDenied = await requireSupportWrite();
+  if (supportDenied) return supportDenied;
+
   const requestId = randomUUID();
   const supabase = await createClient();
 
