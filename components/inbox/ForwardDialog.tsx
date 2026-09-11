@@ -16,6 +16,7 @@ import { Check, MagnifyingGlass } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
 import { useForwardMessages } from "@/hooks/inbox/useForwardMessages";
 import { useForwardTargets } from "@/hooks/inbox/useForwardTargets";
+import { useT } from "@/hooks/i18n/useT";
 
 interface Props {
   open: boolean;
@@ -42,10 +43,11 @@ export function ForwardDialog({
   const [buscaAdiada, setBuscaAdiada] = useState("");
   const [destino, setDestino] = useState<string | null>(null);
   const forward = useForwardMessages();
+  const t = useT();
 
   useEffect(() => {
-    const t = setTimeout(() => setBuscaAdiada(busca), DEBOUNCE_MS);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setBuscaAdiada(busca), DEBOUNCE_MS);
+    return () => clearTimeout(timer);
   }, [busca]);
 
   const alvos = useForwardTargets(buscaAdiada, open);
@@ -71,14 +73,14 @@ export function ForwardDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {total === 1 ? "Encaminhar mensagem" : `Encaminhar ${total} mensagens`}
+            {total === 1 ? t("Encaminhar mensagem") : `${t("Encaminhar")} ${total} ${t("mensagens")}`}
           </DialogTitle>
           <DialogDescription>
             {/* O que o operador precisa saber ANTES de confirmar: o destinatário
                 verá que a mensagem foi encaminhada, e o envio é espaçado — a
                 espera é proposital, não travamento. */}
-            A mensagem chega marcada como encaminhada, igual ao aplicativo.
-            {total > 1 && " O envio é espaçado, então leva alguns segundos."}
+            {t("A mensagem chega marcada como encaminhada, igual ao aplicativo.")}
+            {total > 1 && ` ${t("O envio é espaçado, então leva alguns segundos.")}`}
           </DialogDescription>
         </DialogHeader>
 
@@ -93,9 +95,9 @@ export function ForwardDialog({
               autoFocus
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              placeholder="Buscar conversa por nome ou telefone"
+              placeholder={t("Buscar conversa por nome ou telefone")}
               className="pl-8"
-              aria-label="Buscar conversa de destino"
+              aria-label={t("Buscar conversa de destino")}
             />
           </div>
 
@@ -109,8 +111,8 @@ export function ForwardDialog({
             ) : opcoes.length === 0 ? (
               <p className="p-4 text-center text-sm text-muted-foreground">
                 {buscaAdiada
-                  ? "Nenhuma conversa encontrada."
-                  : "Nenhuma outra conversa disponível."}
+                  ? t("Nenhuma conversa encontrada.")
+                  : t("Nenhuma outra conversa disponível.")}
               </p>
             ) : (
               <ul className="p-1">
@@ -119,7 +121,7 @@ export function ForwardDialog({
                     c.contacts?.display_name ??
                     c.contacts?.name ??
                     c.contacts?.phone_number ??
-                    "Contato sem nome";
+                    t("Contato sem nome");
                   const escolhido = destino === c.id;
                   return (
                     <li key={c.id}>
@@ -154,7 +156,7 @@ export function ForwardDialog({
 
         <DialogFooter>
           <Button variant="ghost" onClick={() => fechar(false)} disabled={forward.isPending}>
-            Cancelar
+            {t("Cancelar")}
           </Button>
           <Button
             disabled={!destino || forward.isPending || total === 0}
@@ -171,7 +173,7 @@ export function ForwardDialog({
               );
             }}
           >
-            {forward.isPending ? "Encaminhando…" : "Encaminhar"}
+            {forward.isPending ? t("Encaminhando…") : t("Encaminhar")}
           </Button>
         </DialogFooter>
       </DialogContent>
