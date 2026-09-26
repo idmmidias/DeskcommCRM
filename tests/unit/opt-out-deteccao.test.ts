@@ -47,6 +47,15 @@ const PEDE_PARA_SAIR = [
   "quero sair da lista",
   "quero cancelar a inscrição",
   "me descadastra aí",
+  // CONTROLE das duas listas separadas (imobiliária, 26/09/2026): aqui o objeto
+  // é a MENSAGEM, e `OBJETOS_DE_CADASTRO_ALHEIO` não entra nos padrões de
+  // cessação. Se algum dia alguém fundir as duas listas, estas quatro caem.
+  "pare de me mandar imoveis",
+  "para de me mandar anuncios de apartamento",
+  // A lista de transmissão é o descadastro mais literal do canal — ela fica de
+  // FORA da exclusão de "outra lista", e é isto que prova.
+  "me tira da lista de transmissao",
+  "quero sair da lista de transmissao",
 ];
 
 /** Frases do dia a dia que usam a palavra e NÃO são pedido de descadastro. */
@@ -80,6 +89,21 @@ const NAO_PEDE_PARA_SAIR = [
   // colagem — o defeito da versão com `\b` ASCII, que já tinha sido corrigido
   "amanhã ele sairá do escritório e pararão as obras",
   "a obra pararia se chovesse",
+  // imobiliária — o cadastro é do IMÓVEL, não da pessoa como destinatária.
+  // Medido em 26/09/2026: `descadastr\w*` era o único padrão da lista sem
+  // âncora de objeto, e quem pede para tirar o imóvel do site é justamente o
+  // cliente que paga a comissão.
+  "quero descadastrar meu imovel",
+  "preciso descadastrar o imóvel do site",
+  "pode descadastrar meu anuncio?",
+  "quero o descadastro do meu imovel",
+  "pode descadastrar a casa da rua bento",
+  // OUTRA lista — o espanhol já excluía "lista de espera"; o português não.
+  // Quem escreve isto QUER continuar sendo atendido.
+  "quero sair da lista de espera",
+  "me tira da lista de espera do apartamento",
+  "me remove da lista de espera por favor",
+  "quero sair da lista de interessados",
   // vazios
   "",
   "   ",
