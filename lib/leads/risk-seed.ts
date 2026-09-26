@@ -169,7 +169,7 @@ async function coletaEClassifica(
       leadId: l.id,
       contactId: l.contact_id,
       bucket,
-      since: sinceDoBucket(bucket, lastActivityAt, window),
+      since: sinceDoBucket(bucket, lastActivityAt, window, now),
       coldHours: window.coldHours,
     });
   }

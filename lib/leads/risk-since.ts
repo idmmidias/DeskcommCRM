@@ -24,18 +24,42 @@ export function sinceDoBucket(
   bucket: RiskBucket,
   lastActivityAt: Date,
   window: StageWindow,
+  /**
+   * O AGORA, para o instante do cruzamento nunca cair no futuro.
+   *
+   * ⚠️ O bucket nem sempre vem do relógio. `classifyRisk` FORÇA `critico`
+   * quando a agenda responde `presenca_vencida` (compromisso que passou e
+   * ninguém marcou Realizado ou Faltou), e força `em_voo` quando ela manda
+   * adiar — nos dois casos sem olhar `hoursSinceActivity`. Aí a conta abaixo
+   * devolve `última atividade + janela`, que para um negócio tocado há pouco é
+   * um instante que AINDA NÃO ACONTECEU.
+   *
+   * O preço disso é a passada inteira da organização: `since > detected_at`
+   * viola `crm_lead_risk_states_since_no_passado`, o upsert lança, e
+   * `observaTravessias` aborta antes de `venceReativacoes`. Medido na F&M: um
+   * compromisso de 24/09 sem desfecho congelou o Radar da conta de 25/09 às
+   * 15h até o relógio alcançar a janela, de 15 em 15 minutos, sem ninguém ver.
+   *
+   * Afrouxar a constraint seria o conserto errado: ela está certa, estado não
+   * começa no futuro. O certo é o produtor não inventar um.
+   */
+  now?: Date,
 ): Date {
   const h = (horas: number): Date =>
     new Date(lastActivityAt.getTime() + horas * 3_600_000);
+  /** Nunca devolve instante futuro: bucket forçado não prova limiar cruzado. */
+  const naoFuturo = (d: Date): Date =>
+    now !== undefined && d.getTime() > now.getTime() ? now : d;
   switch (bucket) {
     case "critico":
-      return h(window.criticalHours);
+      return naoFuturo(h(window.criticalHours));
     case "em_risco":
     // `em_voo` é "esfriou, mas a IA prometeu voltar": ele CRUZOU o limiar de
     // frio como qualquer outro, e o que muda é haver follow-up agendado — não
-    // o instante da travessia.
+    // o instante da travessia. Só que ele TAMBÉM é forçado pela agenda
+    // (`adiar`), e aí o limiar pode não ter sido cruzado: mesmo grampo.
     case "em_voo":
-      return h(window.coldHours);
+      return naoFuturo(h(window.coldHours));
     case "em_dia":
       // Ainda não cruzou nada. O estado começou na última interação.
       return lastActivityAt;
