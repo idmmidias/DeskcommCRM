@@ -474,16 +474,25 @@ export function AgendaClient({
           uma seção, não uma coluna). De `lg` para cima o Sheet segura a altura e
           a LISTA rola, com calendário e contexto parados.
           
-          ⚠️ `lg:overflow-hidden` e não `overflow-y-auto` em todo breakpoint: em
-          `lg` o Sheet tem 1040px com `p-6` → 992px de caixa contra ~980px de
-          painel. Uma barra vertical come essa folga, e como o CSS computa
-          `overflow-x: visible` como `auto` quando `overflow-y` não é `visible`,
-          nasceria barra HORIZONTAL exatamente no breakpoint que o conserto de
-          largura acabou de reparar.
+          ⚠️ O `lg:overflow-hidden` que morava aqui SAIU, e o `overflow-x-hidden`
+          entrou explícito no lugar dele. Aquele `hidden` segurava a altura do
+          Sheet em `lg` contando que a LISTA rolasse por dentro — e o que não
+          coubesse ACIMA dela não tinha como ser alcançado. Medido na tela da F&M
+          em 23/09/2026, em monitor largo: com vínculo do cliente, tipos de
+          agendamento e e-mail do convidado empilhados antes do painel, o
+          calendário era cortado na dobra e o botão de confirmar ficava
+          inalcançável, sem barra nenhuma para chegar até ele. Recortar o
+          controle que conclui a tarefa é pior do que rolar.
+
+          A barra horizontal que aquele `hidden` evitava (em `lg` são 992px de
+          caixa contra ~980px de painel, e o CSS computa `overflow-x: visible`
+          como `auto` quando `overflow-y` não é `visible`) agora é barrada pelo
+          `overflow-x-hidden` explícito, que resolve o sintoma sem cobrar a
+          altura como preço.
         */}
         <SheetContent
           side="right"
-          className="flex w-full flex-col overflow-y-auto sm:max-w-3xl lg:max-w-[1040px] lg:overflow-hidden"
+          className="flex w-full flex-col overflow-y-auto overflow-x-hidden sm:max-w-3xl lg:max-w-[1040px]"
         >
           <SheetHeader>
             <SheetTitle>{remarcandoId ? t("Remarcar agendamento") : t("Novo agendamento")}</SheetTitle>
