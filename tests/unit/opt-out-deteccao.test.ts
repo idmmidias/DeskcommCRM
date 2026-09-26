@@ -52,6 +52,13 @@ const PEDE_PARA_SAIR = [
   "quero sair da lista",
   "quero cancelar a inscrição",
   "me descadastra aí",
+  // CONTROLE das duas listas separadas (imobiliária, 26/09/2026): aqui o objeto
+  // é a MENSAGEM, e `OBJETOS_DE_CADASTRO_ALHEIO` não entra nos padrões de
+  // cessação. Se algum dia alguém fundir as duas listas, estas caem.
+  "pare de me mandar imoveis",
+  "para de me mandar anuncios de apartamento",
+  "me descadastra",
+  "quero me descadastrar",
   // ─── Formas que passavam batido (medido por @deskcommopp4s-cmd, #1607) ─────
   //
   // INFINITIVO — "pode me remover da lista" é como se pede de fato; a lista de
@@ -176,6 +183,16 @@ const NAO_PEDE_PARA_SAIR = [
   // colagem — o defeito da versão com `\b` ASCII, que já tinha sido corrigido
   "amanhã ele sairá do escritório e pararão as obras",
   "a obra pararia se chovesse",
+  // imobiliária — o cadastro é do IMÓVEL, não da pessoa como destinatária.
+  // Medido em 26/09/2026: `descadastr\w*` era o único padrão da lista sem
+  // âncora de objeto, e quem pede para tirar o imóvel do site é justamente o
+  // cliente que paga a comissão.
+  "quero descadastrar meu imovel",
+  "preciso descadastrar o imóvel do site",
+  "pode descadastrar meu anuncio?",
+  "quero o descadastro do meu imovel",
+  "pode descadastrar a casa da rua bento",
+  "quero sair da lista de interessados",
   // ─── Invasores das aberturas do #1607 (@deskcommopp4s-cmd) ────────────────
   //
   // remover/apagar/tirar aparecem, mas o OBJETO não é a comunicação com o
