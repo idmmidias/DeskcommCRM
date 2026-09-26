@@ -137,6 +137,36 @@ const OBJETOS_NAO_COMUNICATIVOS =
   "cobro|cobros|producto|productos|pauta|pautas|presupuesto|presupuestos";
 
 /**
+ * O que está CADASTRADO sem ser a pessoa como destinatária de mensagem — o
+ * imóvel dela no site da imobiliária, o anúncio, o veículo na revenda, a vaga.
+ *
+ * Lista SEPARADA de `OBJETOS_NAO_COMUNICATIVOS` de propósito, e não por gosto:
+ * aquela entra nos padrões de CESSAÇÃO ("parar de mandar o pedido"), e nela
+ * "pare de me mandar imóveis" tem de continuar bloqueando, porque ali o objeto
+ * é a mensagem. Aqui o verbo é `descadastrar`, e o que vem depois dele é o
+ * REGISTRO, não o envio. Fundir as duas trocaria um falso positivo por um falso
+ * negativo.
+ *
+ * Medido numa imobiliária em 26/09/2026, com o padrão anterior:
+ *
+ *   "quero descadastrar meu imóvel"        → PROPRIETÁRIO bloqueado
+ *   "preciso descadastrar o imóvel do site" → PROPRIETÁRIO bloqueado
+ *   "pode descadastrar meu anúncio?"        → PROPRIETÁRIO bloqueado
+ *
+ * É a mesma classe de "tem como parar a dor?", e pela mesma causa: o padrão de
+ * `descadastr\w*` era o ÚNICO desta lista sem âncora de objeto — caçava o
+ * VERBO, e descadastrar é verbo de cadastro mesmo quando o cadastro é de outra
+ * coisa. E o preço é o mais alto do arquivo: quem pede para tirar o imóvel do
+ * site é o cliente que PAGA a comissão, e ele sai da conversa sem que ninguém
+ * saiba, com `stop_keyword` gravado como motivo legítimo.
+ */
+const OBJETOS_DE_CADASTRO_ALHEIO =
+  "imovel|imoveis|anuncio|anuncios|veiculo|veiculos|vaga|vagas|" +
+  "casa|apartamento|terreno|terrenos|loja|sala|chacara|sitio|fazenda|" +
+  // espanhol — a mesma frase, na instalação que roda em espanhol.
+  "inmueble|inmuebles|aviso|avisos|vehiculo|vehiculos|depto|departamento";
+
+/**
  * Determinantes que podem vir entre o verbo e o objeto não comunicativo —
  * "o pedido", "el paquete". Compartilhado pt/es, e não só por DRY: os dois
  * padrões de cessação abaixo (`par(?:ar|a|e|em)` em português e
@@ -149,6 +179,23 @@ const OBJETOS_NAO_COMUNICATIVOS =
 const DETERMINANTES_DE_OBJETO =
   "o|a|os|as|el|los|la|las|meu|minha|meus|minhas|seu|sua|seus|suas|" +
   "mi|mis|tu|tus|esse|essa|esses|essas|ese|esa|esos|esas|nesse|nessa";
+
+/**
+ * A guarda dos dois padrões de `descadastrar`, escrita UMA vez.
+ *
+ * A preposição opcional (`do`, `da`, `de`) é o que faz a forma com substantivo
+ * funcionar: "quero o descadastro DO meu imóvel". Ela não está em
+ * `DETERMINANTES_DE_OBJETO` — aquela lista é de artigo e possessivo, e é a
+ * mesma dos padrões de cessação, onde preposição não aparece ("parar de mandar
+ * o pedido"). Acrescentá-la lá afrouxaria seis padrões para resolver dois.
+ *
+ * Os dois padrões compartilham a guarda de propósito: `descadastr\w*` casa
+ * "descadastro" sozinho, mas só o padrão do substantivo alcança a forma com
+ * artigo, e guardar um só deixava a porta aberta — foi o que o teste pegou.
+ */
+const SEGUIDO_DE_CADASTRO_ALHEIO =
+  `(?!\\s+(?:d(?:o|a|e|os|as)\\s+)?(?:${DETERMINANTES_DE_OBJETO})?\\s*` +
+  `(?:${OBJETOS_DE_CADASTRO_ALHEIO})\\b)`;
 
 /**
  * Pedidos INEQUÍVOCOS de descadastro escritos por extenso. Todos exigem o objeto
@@ -193,11 +240,33 @@ const FRASES_DE_OPT_OUT: readonly RegExp[] = [
       `(?!\\s+(?:${DETERMINANTES_DE_OBJETO})?\\s*(?:${OBJETOS_NAO_COMUNICATIVOS})\\b)`,
     "u",
   ),
-  /\bme\s+(?:tira|tire|tirem|remove|remova|removam|retira|retire|exclui|exclua|apaga|apague)\s+(?:da|dessa|desta|de\s+sua|da\s+sua)\s+lista\b/u,
-  /\bsair\s+d(?:a|essa|esta)\s+lista\b/u,
+  // `lista` sozinha vale, MENOS quando o que vem depois diz que é OUTRA lista.
+  //
+  // O espanhol já tinha esta exclusão (`(?!\s+de\s+(?:espera|precios|invitados))`,
+  // abaixo) desde que "sacame de la lista de espera" foi medido bloqueando quem
+  // queria continuar sendo atendido. O português nunca a recebeu — assimetria,
+  // não decisão, como a de `no quiero mas mensajes` e a de `ya no me interesa`
+  // que este arquivo já registra. Medido numa imobiliária em 26/09/2026:
+  //
+  //   "quero sair da lista de espera"              → CLIENTE bloqueado
+  //   "me tira da lista de espera do apartamento"  → CLIENTE bloqueado
+  //   "quero sair da lista de interessados"        → CLIENTE bloqueado
+  //
+  // `interessados` entra junto pelo mesmo motivo que `espera`: é a lista de UM
+  // imóvel, e sair dela é dizer "esse não me serve", o oposto de pedir silêncio.
+  // `transmissao` fica de FORA de propósito — "me tira da lista de transmissão"
+  // é pedido de descadastro de verdade, e o mais literal que existe no canal.
+  /\bme\s+(?:tira|tire|tirem|remove|remova|removam|retira|retire|exclui|exclua|apaga|apague)\s+(?:da|dessa|desta|de\s+sua|da\s+sua)\s+lista\b(?!\s+de\s+(?:espera|precos|convidados|interessados|presenca))/u,
+  /\bsair\s+d(?:a|essa|esta)\s+lista\b(?!\s+de\s+(?:espera|precos|convidados|interessados|presenca))/u,
   /\bcancelar?\s+(?:a\s+)?(?:inscricao|assinatura)\b/u,
-  /\b(?:me\s+)?descadastr\w*\b/u,
-  /\bdescadastro\b/u,
+  // O lookahead de `OBJETOS_DE_CADASTRO_ALHEIO` — ver o comentário da constante
+  // para o que foi medido. Sem ele, estes dois padrões eram os únicos da lista
+  // que ancoravam só no VERBO, o defeito que o cabeçalho deste arquivo existe
+  // para impedir. Os dois recebem a mesma guarda: `descadastr\w*` também casa
+  // "descadastro", mas o padrão do substantivo pega a forma com artigo ("quero
+  // o descadastro do meu imóvel"), e consertar um só deixaria a porta aberta.
+  new RegExp(`\\b(?:me\\s+)?descadastr\\w*\\b${SEGUIDO_DE_CADASTRO_ALHEIO}`, "u"),
+  new RegExp(`\\bdescadastro\\b${SEGUIDO_DE_CADASTRO_ALHEIO}`, "u"),
   // ── espanhol ──────────────────────────────────────────────────────────────
   //
   // Mesma regra das de cima: TODAS exigem o objeto de comunicação. Sem isso
