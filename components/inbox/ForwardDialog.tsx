@@ -14,6 +14,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Check, MagnifyingGlass } from "@/lib/ui/icons";
 import { cn } from "@/lib/utils";
+import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { useForwardMessages } from "@/hooks/inbox/useForwardMessages";
 import { useForwardTargets } from "@/hooks/inbox/useForwardTargets";
 import { useT } from "@/hooks/i18n/useT";
@@ -117,11 +118,15 @@ export function ForwardDialog({
             ) : (
               <ul className="p-1">
                 {opcoes.map((c) => {
-                  const nome =
-                    c.contacts?.display_name ??
-                    c.contacts?.name ??
-                    c.contacts?.phone_number ??
-                    t("Contato sem nome");
+                  // `rotuloDoContato` e não a cadeia à mão: a cerca
+                  // `rotulo-do-contato.test.ts` (upstream, posterior a este
+                  // patch) proíbe a sexta cópia dela, e com razão. De quebra
+                  // conserta a ORDEM: a versão anterior daqui preferia
+                  // `display_name` (o pushName do aparelho) ao `name` do
+                  // cadastro, que é o contrário do que o módulo documenta, e
+                  // ainda mostrava o telefone cru, sem o nono dígito que o
+                  // atendente espera copiar.
+                  const nome = rotuloDoContato(c.contacts, t);
                   const escolhido = destino === c.id;
                   return (
                     <li key={c.id}>
