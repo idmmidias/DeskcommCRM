@@ -91,10 +91,7 @@ async function handle(req: NextRequest): Promise<Response> {
 
   // Um SELECT por organização presente, não um por linha.
   const orgs = [...new Set(linhas.map((l) => l.organization_id))];
-  const { data: configs } = await admin
-    .from("organizations")
-    .select("id, settings")
-    .in("id", orgs);
+  const { data: configs } = await admin.from("organizations").select("id, settings").in("id", orgs);
 
   const prazoPorOrg = new Map<string, number>();
   for (const o of configs ?? []) {
@@ -131,6 +128,29 @@ async function handle(req: NextRequest): Promise<Response> {
     .from("calendar_appointments")
     .update({
       status: "cancelled",
+      // ⛔ `cancelled_at` É OBRIGATÓRIO AQUI, e a conta é do banco, não de estilo.
+      //
+      // `calendar_appointments_cancelamento_coerente` exige os dois juntos:
+      //
+      //   CHECK ((status <> 'cancelled' AND cancelled_at IS NULL)
+      //       OR (status = 'cancelled' AND cancelled_at IS NOT NULL))
+      //
+      // Sem esta linha, TODA rodada que encontra um pendente vencido viola a
+      // constraint, o UPDATE devolve erro e a rota responde 500. Ou seja: a
+      // expiração nunca funcionou, e o efeito é exatamente o que o cabeçalho
+      // deste arquivo existe para impedir — "indecisão vira horário travado para
+      // sempre", com o próximo cliente ouvindo "não tenho horário" por causa de
+      // um pedido abandonado. Falha silenciosa de um lado (o horário some) e
+      // ruidosa do outro (um erro por rodada, de 15 em 15 minutos).
+      //
+      // Medido numa instalação em 27/09/2026, logo após atualizar para a 1.52.0:
+      // dois pendentes na base e `[agenda-expira-pendentes] update falhou` com
+      // `violates check constraint "calendar_appointments_cancelamento_coerente"`
+      // em toda passada.
+      //
+      // O instante é o `agora` da rodada, o mesmo que decidiu o vencimento, e não
+      // um `now()` do banco: quem cancelou foi esta varredura, neste instante.
+      cancelled_at: agora.toISOString(),
       cancellation_reason: "Pedido expirado: ninguém confirmou dentro do prazo.",
     })
     .in("id", expirados)
@@ -160,10 +180,7 @@ async function handle(req: NextRequest): Promise<Response> {
     });
   }
 
-  return ok(
-    { examinados: linhas.length, expirados: quantos, mantidos },
-    { requestId },
-  );
+  return ok({ examinados: linhas.length, expirados: quantos, mantidos }, { requestId });
 }
 
 export const GET = handle;
