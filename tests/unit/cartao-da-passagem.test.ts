@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  FRASE_DA_PASSAGEM_PELA_IA,
   montarCartoesDaPassagem,
   type PassagemDaConversa,
   type QuemOlha,
@@ -357,5 +358,68 @@ describe("cartão da passagem — contato anonimizado", () => {
     )[0]!;
     expect(c.falaDoCliente).toBeNull();
     expect(c.clienteQuer).toBeNull();
+  });
+});
+
+/**
+ * [IDM] A MANCHETE DA PASSAGEM FEITA PELA IA.
+ *
+ * `human-handoff.ts` grava toda passagem da ferramenta do modelo como
+ * `requested_human`, e a frase desse código diz que o cliente pediu uma pessoa.
+ * Na F&M, 2 de 2 passagens da Mariana abriam o cartão com essa frase sem o
+ * cliente ter pedido nada. A manchete passa a ser o porquê que ela escreveu.
+ */
+describe("[IDM] cartão da passagem — a manchete da passagem feita pela IA", () => {
+  const daIa = (over: Partial<PassagemDaConversa> = {}) =>
+    passagem({ origem: "ferramenta_do_modelo", motivo_codigo: "requested_human", ...over });
+
+  it("abre com o porquê que a IA escreveu, sem tradução, e ele não se repete embaixo", () => {
+    const c = montarCartoesDaPassagem(
+      [daIa({ content: "Lead pedindo dados do imóvel que eu não tenho." })],
+      NINGUEM_ATENDE,
+    )[0]!;
+    expect(c.manchete).toEqual({
+      texto: "Lead pedindo dados do imóvel que eu não tenho.",
+      traduzir: false,
+    });
+    expect(c.textoDeQuemPassou).toBeNull();
+  });
+
+  it("sem porquê escrito, a manchete é neutra, nunca 'o cliente pediu uma pessoa'", () => {
+    const c = montarCartoesDaPassagem([daIa({ content: "  " })], NINGUEM_ATENDE)[0]!;
+    expect(c.manchete).toEqual({ texto: FRASE_DA_PASSAGEM_PELA_IA, traduzir: true });
+    expect(c.manchete.texto).not.toBe(FRASE_DO_MOTIVO.requested_human);
+  });
+
+  it("pedido EXPLÍCITO do cliente mantém a frase fixa, que ali é verdade, e o texto de quem passou fica", () => {
+    const c = montarCartoesDaPassagem(
+      [passagem({ origem: "pedido_explicito", content: "pediu atendente" })],
+      NINGUEM_ATENDE,
+    )[0]!;
+    expect(c.manchete).toEqual({ texto: FRASE_DO_MOTIVO.requested_human, traduzir: true });
+    expect(c.textoDeQuemPassou).toBe("pediu atendente");
+  });
+
+  it("motivo que não é o fixo da ferramenta nunca é trocado pelo texto da IA", () => {
+    // Opt-out é sinal de segurança: a frase dele tem de chegar como está.
+    const c = montarCartoesDaPassagem(
+      [daIa({ motivo_codigo: "suspected_optout", content: "qualquer coisa" })],
+      NINGUEM_ATENDE,
+    )[0]!;
+    expect(c.manchete).toEqual({ texto: FRASE_DO_MOTIVO.suspected_optout, traduzir: true });
+  });
+
+  it("contato anonimizado nunca ressuscita o texto da IA na manchete", () => {
+    const c = montarCartoesDaPassagem(
+      [daIa({ body: "Cliente Anonimizado #0b1f7a2e", content: "sobra de um clone antigo" })],
+      NINGUEM_ATENDE,
+    )[0]!;
+    expect(c.anonimizada).toBe(true);
+    expect(c.manchete).toEqual({ texto: FRASE_DA_PASSAGEM_PELA_IA, traduzir: true });
+    expect(JSON.stringify(c)).not.toContain("sobra de um clone antigo");
+  });
+
+  it("a manchete neutra tem par `es`: ela chega à tela por VARIÁVEL", () => {
+    expect(DICIONARIO[FRASE_DA_PASSAGEM_PELA_IA]?.es).toBeDefined();
   });
 });

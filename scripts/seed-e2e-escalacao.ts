@@ -473,7 +473,9 @@ async function semearPassagemComContexto(
     conversation_id: conversaId,
     contact_id: contatoId,
     contact_name: NOME_DA_PASSAGEM,
-    motivo_frase: "O cliente pediu para falar com uma pessoa",
+    // [IDM] Passagem da ferramenta da IA: a manchete do cartão é o porquê que ela
+    // escreveu (`motivo.texto` acima), não a frase fixa de `requested_human`.
+    motivo_frase: "o cliente pediu atendimento humano",
     fala_do_cliente: FALA_DO_CLIENTE,
     tentativa: TENTATIVA,
   };

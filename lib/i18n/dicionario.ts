@@ -11491,6 +11491,10 @@ export const DICIONARIO: Traducoes = {
     { es: "Otra persona está atendiendo. Si necesitas asumir, usa Transferir en la parte superior de la conversación." },
   "está atendendo. Se precisar assumir, use Transferir no topo da conversa.":
     { es: "está atendiendo. Si necesitas asumir, usa Transferir en la parte superior de la conversación." },
+  // [IDM] A manchete neutra da passagem da IA sem porquê escrito. Chega por
+  // VARIÁVEL; quem cobra o par `es` dela é `tests/unit/cartao-da-passagem.test.ts`.
+  // ("Ver detalhes", o outro texto novo do cartão, já existia neste dicionário.)
+  "A IA passou o atendimento para uma pessoa": { es: "La IA pasó la atención a una persona" },
   // A cobrança da passagem esquecida (`app/api/v1/cron/case-stale-watcher`).
   // Traduzida no SERVIDOR, no insert, pela mesma razão do corpo do aviso acima.
   "Alguém pediu atendimento e ninguém assumiu":

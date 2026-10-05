@@ -55,6 +55,15 @@ interface Props {
  * teste do metro. As tentativas são `<ol>` de verdade, e as passagens antigas
  * usam `<details>` nativo — teclado e leitor de tela de graça.
  *
+ * ═══ [IDM] Só o essencial à vista ═══
+ *
+ * À vista ficam a manchete, o que o cliente quer, as palavras dele e o aviso.
+ * "A IA já tentou" e o resumo vão para "Ver detalhes", fechado. O resumo é o
+ * `body` inteiro, que já narra as seções de cima, e o "Contexto acumulado" dele
+ * vem do checkpoint do turno ANTERIOR: na F&M ele dizia "nenhuma qualificação
+ * feita" num cartão cujo lead já tinha o imóvel identificado. Aberto, o cartão
+ * tinha ~25 linhas para dizer quatro coisas, e a equipe lê no meio do atendimento.
+ *
  * ⚠️ **GUARDA DE LOCALIZADOR.** O convite se chama "Assumir e responder", e o
  * cabeçalho tem um botão "Assumir". As duas specs que clicam o do cabeçalho usam
  * localizador ANCORADO (`{ name: "Assumir", exact: true }` em
@@ -78,7 +87,7 @@ export function PassagemCard({ cartao, contatoId, onAssumir, assumindo }: Props)
           data-passagem-recolhido="true"
         >
           <summary className="cursor-pointer text-xs text-muted-foreground">
-            {t(cartao.motivo)}
+            <TextoDaManchete cartao={cartao} />
             {cartao.percebidoPeloJev && <> {t("(percebido pelo Jev)")}</>} · {hora}
           </summary>
           <div className="mt-2">
@@ -138,27 +147,14 @@ function Corpo({ cartao, tituloId }: { cartao: CartaoDaPassagem; tituloId: strin
 
   return (
     <>
-      <p className="mt-1.5 font-medium" data-testid="passagem-motivo">
-        {t(cartao.motivo)}
+      <p className="mt-1.5 whitespace-pre-wrap break-words font-medium" data-testid="passagem-motivo">
+        <TextoDaManchete cartao={cartao} />
         {cartao.percebidoPeloJev && <> {t("(percebido pelo Jev)")}</>}
       </p>
 
       {cartao.clienteQuer !== null && (
         <Secao rotulo={t("O cliente quer")}>
           <p className="whitespace-pre-wrap break-words">{cartao.clienteQuer}</p>
-        </Secao>
-      )}
-
-      {cartao.tentativas.length > 0 && (
-        <Secao rotulo={t("A IA já tentou")}>
-          <ol className="list-decimal space-y-0.5 pl-4" data-testid="passagem-tentativas">
-            {cartao.tentativas.map((tentativa, i) => (
-              <li key={`${tituloId}-t${i}`} className="whitespace-pre-wrap break-words">
-                {tentativa.o_que}
-                {tentativa.desfecho !== undefined && ` → ${tentativa.desfecho}`}
-              </li>
-            ))}
-          </ol>
         </Secao>
       )}
 
@@ -170,17 +166,6 @@ function Corpo({ cartao, tituloId }: { cartao: CartaoDaPassagem; tituloId: strin
           <blockquote className="whitespace-pre-wrap break-words border-l-2 border-border pl-2 italic">
             {`“${cartao.falaDoCliente}”`}
           </blockquote>
-        </Secao>
-      )}
-
-      {/* "(confira)" no rótulo, e não numa nota de rodapé: é a IA resumindo, e
-          quem vai responder assume o que disser. Esconder a seção quando ela é o
-          piso evita o cabeçalho órfão — três linhas para dizer nada. */}
-      {cartao.resumo !== null && (
-        <Secao rotulo={t("Resumo da IA (confira)")}>
-          <p className="whitespace-pre-wrap break-words" data-testid="passagem-resumo">
-            {cartao.resumo}
-          </p>
         </Secao>
       )}
 
@@ -214,8 +199,50 @@ function Corpo({ cartao, tituloId }: { cartao: CartaoDaPassagem; tituloId: strin
           )}
         </p>
       )}
+
+      {/* [IDM] O que ajuda a conferir, mas não decide a próxima frase: fechado. */}
+      {(cartao.tentativas.length > 0 || cartao.resumo !== null) && (
+        <details className="mt-2" data-testid="passagem-detalhes">
+          <summary className="cursor-pointer text-xs text-muted-foreground">
+            {t("Ver detalhes")}
+          </summary>
+
+          {cartao.tentativas.length > 0 && (
+            <Secao rotulo={t("A IA já tentou")}>
+              <ol className="list-decimal space-y-0.5 pl-4" data-testid="passagem-tentativas">
+                {cartao.tentativas.map((tentativa, i) => (
+                  <li key={`${tituloId}-t${i}`} className="whitespace-pre-wrap break-words">
+                    {tentativa.o_que}
+                    {tentativa.desfecho !== undefined && ` → ${tentativa.desfecho}`}
+                  </li>
+                ))}
+              </ol>
+            </Secao>
+          )}
+
+          {/* "(confira)" no rótulo, e não numa nota de rodapé: é a IA resumindo, e
+              quem vai responder assume o que disser. Esconder a seção quando ela é o
+              piso evita o cabeçalho órfão — três linhas para dizer nada. */}
+          {cartao.resumo !== null && (
+            <Secao rotulo={t("Resumo da IA (confira)")}>
+              <p className="whitespace-pre-wrap break-words" data-testid="passagem-resumo">
+                {cartao.resumo}
+              </p>
+            </Secao>
+          )}
+        </details>
+      )}
     </>
   );
+}
+
+/**
+ * [IDM] A manchete: frase do produto passa por `t()`; o que a IA escreveu sai
+ * como está. Texto de fora nunca vira chave de tradução nem link.
+ */
+function TextoDaManchete({ cartao }: { cartao: CartaoDaPassagem }) {
+  const t = useT();
+  return <>{cartao.manchete.traduzir ? t(cartao.manchete.texto) : cartao.manchete.texto}</>;
 }
 
 function Secao({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {

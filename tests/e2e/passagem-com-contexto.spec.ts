@@ -180,6 +180,9 @@ test.describe("a passagem para humano chega com contexto", () => {
       "o cartão tem de dizer o que o cliente quer, na leitura da IA",
     ).toContainText("falar com uma pessoa sobre a troca do produto");
 
+    // [IDM] Tentativas e resumo moram em "Ver detalhes", fechado por padrão.
+    await expect(cartao.getByTestId("passagem-tentativas")).toBeHidden();
+    await cartao.getByTestId("passagem-detalhes").locator("summary").click();
     const tentativas = cartao.getByTestId("passagem-tentativas");
     await expect(tentativas).toBeVisible();
     await expect(tentativas).toContainText(cenario.tentativa);
