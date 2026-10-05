@@ -94,6 +94,16 @@ export type AcaoDoCartao =
   | { tipo: "avisa_quem_atende"; donoNome: string | null }
   | { tipo: "nenhuma" };
 
+/**
+ * A primeira linha do cartão. `traduzir` separa as duas naturezas de texto que
+ * podem ocupá-la: FRASE do produto (vai por `t()`) e texto de FORA, escrito pela
+ * IA, que sai como está e nunca passa por `t()` nem vira link.
+ */
+export interface MancheteDoCartao {
+  texto: string;
+  traduzir: boolean;
+}
+
 export interface CartaoDaPassagem {
   id: string;
   /** ISO-8601. A tela formata; o módulo não sabe de fuso nem de idioma. */
@@ -108,6 +118,8 @@ export interface CartaoDaPassagem {
   /** Em português. A tela passa por `t()`; o código do banco não chega lá. */
   titulo: string;
   motivo: string;
+  /** [IDM] O que a tela mostra no lugar do motivo. Ver `mancheteDe`. */
+  manchete: MancheteDoCartao;
   /**
    * Quem percebeu a irritação foi o Jev (D11): a tela acrescenta "(percebido
    * pelo Jev)" ao motivo. Só na tela da equipe — nunca na mensagem ao cliente.
@@ -190,6 +202,36 @@ function acaoDe(input: {
 const TITULO_PADRAO = "Por que a IA passou para você";
 const TITULO_OPT_OUT = "O cliente pode ter pedido para parar de receber mensagens";
 
+/** [IDM] A manchete da passagem da IA quando ela não escreveu o porquê. */
+export const FRASE_DA_PASSAGEM_PELA_IA = "A IA passou o atendimento para uma pessoa";
+
+/**
+ * [IDM] A MANCHETE DA PASSAGEM FEITA PELA IA É O QUE ELA ESCREVEU.
+ *
+ * `human-handoff.ts` grava toda passagem da ferramenta do modelo como
+ * `requested_human`, fixo, porque a ferramenta não tem campo de motivo. A frase
+ * desse código ("O cliente pediu para falar com uma pessoa") é verdade na
+ * detecção de pedido explícito e falsa no resto: a IA que passa porque não tem o
+ * dado do imóvel abria o cartão dizendo que o cliente pediu gente. Medido na F&M
+ * em 29/09/2026: 2 de 2 passagens da ferramenta com esse código, nenhuma com
+ * pedido do cliente.
+ *
+ * O `por_que` que a IA escreveu (coluna `content`) é a melhor manchete para esse
+ * caso, e deixa de aparecer de novo em "Escrito por quem passou". Sem ele, uma
+ * frase neutra, nunca a do pedido. Opt-out e os motivos determinísticos ficam
+ * como estão: o código deles é escolhido por quem detectou, e a frase é verdade.
+ */
+function mancheteDe(p: PassagemDaConversa, anonimizada: boolean): MancheteDoCartao {
+  const daFerramentaDaIa =
+    p.origem === "ferramenta_do_modelo" && p.motivo_codigo === "requested_human";
+  if (!daFerramentaDaIa) return { texto: FRASE_DO_MOTIVO[p.motivo_codigo], traduzir: true };
+  // Anonimizada nunca usa `content`: a cascata garante só o `body` reescrito.
+  const escrito = anonimizada ? null : texto(p.content);
+  return escrito === null
+    ? { texto: FRASE_DA_PASSAGEM_PELA_IA, traduzir: true }
+    : { texto: escrito, traduzir: false };
+}
+
 /**
  * Monta os cartões de UMA conversa, em ordem cronológica.
  *
@@ -212,6 +254,7 @@ export function montarCartoesDaPassagem(
     const estado = estadoDe(p);
     const corpo = texto(p.body);
     const semContexto = anonimizada || corpo === null || corpo === PISO_DO_BRIEFING.trim();
+    const manchete = mancheteDe(p, anonimizada);
 
     return {
       id: p.id,
@@ -222,6 +265,7 @@ export function montarCartoesDaPassagem(
       recolhido: !ultima,
       titulo: optOut ? TITULO_OPT_OUT : TITULO_PADRAO,
       motivo: FRASE_DO_MOTIVO[p.motivo_codigo],
+      manchete,
       // O motivo aparece em destaque, e o resumo embaixo é que dizia quem
       // percebeu: a atribuição ficava longe da frase que ela qualifica.
       percebidoPeloJev:
@@ -230,7 +274,8 @@ export function montarCartoesDaPassagem(
       resumo: semContexto ? null : corpo,
       semContexto,
       falaDoCliente: anonimizada ? null : texto(p.notes),
-      textoDeQuemPassou: anonimizada ? null : texto(p.content),
+      // [IDM] Quando o texto já é a manchete, repeti-lo embaixo é a mesma frase duas vezes.
+      textoDeQuemPassou: anonimizada || !manchete.traduzir ? null : texto(p.content),
       tentativas: anonimizada ? [] : tentativasLegiveis(p.tentativas),
       aviso:
         anonimizada || p.cliente_avisado === null
