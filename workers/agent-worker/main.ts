@@ -343,6 +343,7 @@ export async function startWorker(
       intervalMs: env.CRM_DRAIN_INTERVAL_MS,
       idleIntervalMs: env.CRM_DRAIN_IDLE_INTERVAL_MS,
       debounceMs: env.INBOUND_DEBOUNCE_MS,
+      debounceTetoMs: env.INBOUND_DEBOUNCE_TETO_MS,
       reapTimeoutMs: env.CRM_EVENT_REAP_TIMEOUT_MS,
       allowlistTtlMs: env.AI_ALLOWLIST_TTL_DAYS * 24 * 60 * 60 * 1000,
     },

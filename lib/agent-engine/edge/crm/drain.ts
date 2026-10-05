@@ -18,7 +18,7 @@ import type pg from 'pg';
 import { insertInboxItem } from '../../db/repository';
 import type { Logger } from '../../obs/logger';
 import { enqueueJob } from '../../queue/queue';
-import { decidirRajada } from './debounce';
+import { decidirRajada, estenderJanelaDaRajada } from './debounce';
 import { avisoDeEventoMorto, IA_QUE_NAO_RESPONDEU } from '@/lib/event-log/aviso-de-evento-morto';
 import { TIPOS_DERIVAVEIS, DERIVACAO_TERMINADA } from '@/lib/messaging/media/derivable';
 import { decidirElegibilidadeDaConversa } from '@/lib/ai/elegibilidade/consulta-pg';
@@ -49,6 +49,11 @@ export interface DrainKnobs {
   idleIntervalMs: number;
   /** Janela de coalescência de rajada inbound por contato (0 = sem debounce). */
   debounceMs: number;
+  /**
+   * [IDM] Teto da janela DESLIZANTE (`INBOUND_DEBOUNCE_TETO_MS`). Ausente ou 0 =
+   * janela ancorada, o comportamento do upstream. Ver `./debounce.ts`.
+   */
+  debounceTetoMs?: number;
   /** Evento 'processing' órfão volta a 'pending' após isto. */
   reapTimeoutMs: number;
   /**
@@ -468,6 +473,33 @@ async function processEvent(
         tipo: midia.type,
         esperando_ha_ms: esperandoHa,
       });
+      // [IDM] No modo deslizante, a mídia em leitura também SEGURA o turno que
+      // já está na fila. Adiar só ESTE evento não basta: o texto que chegou
+      // antes da foto já tem job, e ele rodava no fim da janela dele, sem a foto.
+      // Cada nova checagem (a cada ESPERA_DERIVACAO_MS) empurra a janela de novo,
+      // até a leitura terminar ou o teto da rajada vencer. Falha aqui não derruba
+      // o adiamento: o pior caso é o comportamento de antes.
+      if ((knobs.debounceTetoMs ?? 0) > 0 && knobs.debounceMs > 0) {
+        try {
+          const segurado = await estenderJanelaDaRajada(
+            pool,
+            { organizationId: event.organization_id, contactId: p.contact_id },
+            knobs.debounceMs,
+            knobs.debounceTetoMs ?? 0,
+          );
+          if (segurado !== undefined) {
+            log.info('drain: turno pendente segurado pela mídia em leitura', {
+              event_id: event.id,
+              job_id: segurado,
+            });
+          }
+        } catch (err) {
+          log.warn('drain: não consegui segurar o turno pela mídia — seguindo', {
+            event_id: event.id,
+            error: (err instanceof Error ? err.message : String(err)).slice(0, 160),
+          });
+        }
+      }
       return 'adiar';
     }
     log.warn('drain: derivação não concluiu no teto — seguindo sem o texto', {
@@ -486,6 +518,8 @@ async function processEvent(
     pool,
     { organizationId: event.organization_id, contactId: p.contact_id },
     knobs.debounceMs,
+    Date.now(),
+    knobs.debounceTetoMs ?? 0,
   );
   if (rajada.tipo === 'coalescido') {
     log.info('drain: rajada coalescida em job pendente', {

@@ -127,6 +127,11 @@ const envSchema = z.object({
   // Coalescência de rajada inbound: mensagens do MESMO contato dentro desta
   // janela viram UM job (responder em rajada é gatilho de ban). 0 = sem debounce.
   INBOUND_DEBOUNCE_MS: z.coerce.number().int().min(0).default(8_000),
+  // [IDM] Teto da janela DESLIZANTE. 0 (padrão) = janela ancorada no primeiro job,
+  // o comportamento do upstream. > 0 = cada mensagem empurra o turno para
+  // `agora + INBOUND_DEBOUNCE_MS`, nunca além de `criação do job + este teto`, e a
+  // mídia ainda em leitura também segura o turno. Ver ./edge/crm/debounce.ts.
+  INBOUND_DEBOUNCE_TETO_MS: z.coerce.number().int().min(0).default(0),
   // Circuito de saúde do número — ritmo do ticker (block/response rate por número).
   NUMBER_HEALTH_INTERVAL_MS: z.coerce.number().int().positive().default(300_000),
   // Cron persistente por contato — knobs, nunca constantes.
