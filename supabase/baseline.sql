@@ -5434,6 +5434,56 @@ grant execute on function public.fn_can_view_conversation(uuid, uuid)
 -- continua, e é ele que limpa o clone que recebeu a versão antiga. Vigiado por
 -- `tests/unit/baseline-nao-constroi-o-que-derruba.test.ts`.
 
+-- (migration 9092, editada NO LUGAR: a leitura de LEADS passa a avaliar o escopo do
+-- usuário UMA vez por consulta — `fn_escopo_de_visao_do_usuario()` — em vez de chamar
+-- fn_can_view_lead por linha. Nasceu como 9061 do fork em 31/10/2026 cobrindo também
+-- conversas; a parte de conversas saiu porque a 0726 do upstream resolve o mesmo defeito
+-- (#3090) com `fn_conversation_scope()`, e mensagens herdam dela pelo `exists`. A função
+-- fica aqui, e não no fim, porque `crm_leads_select` logo abaixo a usa, e definição
+-- intermediária diferente da final é reprovada por
+-- tests/unit/baseline-nao-constroi-o-que-derruba.test.ts.)
+create or replace function public.fn_escopo_de_visao_do_usuario()
+returns table (organization_id uuid, modo text)
+language sql stable security definer
+set search_path = public
+as $$
+  with suporte as (
+    select public.fn_support_context() as s
+  ),
+  membro as (
+    select uo.organization_id, uo.role
+      from public.user_organizations uo
+     where uo.user_id = auth.uid()
+       and uo.revoked_at is null
+  )
+  -- Suporte ativo na organização: fn_user_role_in_org devolve 'admin' ou 'viewer',
+  -- e os dois enxergam todas as conversas e todos os leads.
+  select (s->>'organization_id')::uuid, 'todas'::text
+    from suporte
+   where s->>'status' = 'active'
+  union
+  select m.organization_id,
+         case
+           when m.role in ('viewer', 'manager', 'admin') then 'todas'
+           else case coalesce(
+                  (select o.settings->>'visibility_mode'
+                     from public.organizations o
+                    where o.id = m.organization_id),
+                  'own_and_unassigned')
+                  when 'all' then 'todas'
+                  when 'own_and_unassigned' then 'proprias_e_sem_dono'
+                  else 'proprias'
+                end
+         end
+    from membro m;
+$$;
+
+revoke all on function public.fn_escopo_de_visao_do_usuario() from public;
+revoke execute on function public.fn_escopo_de_visao_do_usuario() from anon;
+grant execute on function public.fn_escopo_de_visao_do_usuario()
+  to authenticated, service_role;
+
+
 drop policy if exists "conversations_agent_write" on public.conversations;
 drop policy if exists "conversations_agent_insert" on public.conversations;
 drop policy if exists "conversations_agent_update" on public.conversations;
@@ -5470,7 +5520,7 @@ drop policy if exists "messages_delete" on public.messages;
 
 create policy "messages_select" on public.messages
   for select using (
-    public.fn_is_platform_admin()
+    (select public.fn_is_platform_admin())
     or exists (
       select 1 from public.conversations c
       where c.id = messages.conversation_id
@@ -5620,7 +5670,18 @@ drop policy if exists "crm_leads_delete" on public.crm_leads;
 
 create policy "crm_leads_select" on public.crm_leads
   for select using (
-    public.fn_can_view_lead(organization_id, owner_user_id)
+    (select public.fn_is_platform_admin())
+    or organization_id in (
+         select e.organization_id from public.fn_escopo_de_visao_do_usuario() e
+          where e.modo = 'todas')
+    or (owner_user_id = (select auth.uid())
+        and organization_id in (
+          select e.organization_id from public.fn_escopo_de_visao_do_usuario() e
+           where e.modo in ('proprias', 'proprias_e_sem_dono')))
+    or (owner_user_id is null
+        and organization_id in (
+          select e.organization_id from public.fn_escopo_de_visao_do_usuario() e
+           where e.modo = 'proprias_e_sem_dono'))
   );
 
 create policy "crm_leads_insert" on public.crm_leads
