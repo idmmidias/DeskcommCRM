@@ -364,14 +364,15 @@ describe("cartão da passagem — contato anonimizado", () => {
 /**
  * [IDM] A MANCHETE DA PASSAGEM FEITA PELA IA.
  *
- * `human-handoff.ts` grava toda passagem da ferramenta do modelo como
- * `requested_human`, e a frase desse código diz que o cliente pediu uma pessoa.
- * Na F&M, 2 de 2 passagens da Mariana abriam o cartão com essa frase sem o
- * cliente ter pedido nada. A manchete passa a ser o porquê que ela escreveu.
+ * Na 1.52 toda passagem da ferramenta do modelo era `requested_human` e o cartão
+ * dizia que o cliente pediu uma pessoa (F&M: 2 de 2 sem pedido). Desde o #3310 o
+ * motivo ausente é `low_confidence`, "o assistente não teve confiança", que também
+ * não descreve a IA que passa por desenho. A manchete passa a ser o porquê que ela
+ * escreveu.
  */
 describe("[IDM] cartão da passagem — a manchete da passagem feita pela IA", () => {
   const daIa = (over: Partial<PassagemDaConversa> = {}) =>
-    passagem({ origem: "ferramenta_do_modelo", motivo_codigo: "requested_human", ...over });
+    passagem({ origem: "ferramenta_do_modelo", motivo_codigo: "low_confidence", ...over });
 
   it("abre com o porquê que a IA escreveu, sem tradução, e ele não se repete embaixo", () => {
     const c = montarCartoesDaPassagem(
@@ -385,10 +386,29 @@ describe("[IDM] cartão da passagem — a manchete da passagem feita pela IA", (
     expect(c.textoDeQuemPassou).toBeNull();
   });
 
-  it("sem porquê escrito, a manchete é neutra, nunca 'o cliente pediu uma pessoa'", () => {
+  it("sem porquê escrito, o 'não declarado' da ferramenta vira manchete neutra", () => {
     const c = montarCartoesDaPassagem([daIa({ content: "  " })], NINGUEM_ATENDE)[0]!;
     expect(c.manchete).toEqual({ texto: FRASE_DA_PASSAGEM_PELA_IA, traduzir: true });
+    expect(c.manchete.texto).not.toBe(FRASE_DO_MOTIVO.low_confidence);
     expect(c.manchete.texto).not.toBe(FRASE_DO_MOTIVO.requested_human);
+  });
+
+  it("os códigos que a IA DECLARA também cedem a manchete ao porquê escrito", () => {
+    for (const motivo_codigo of ["requested_human", "critical_stage"] as const) {
+      const c = montarCartoesDaPassagem(
+        [daIa({ motivo_codigo, content: "Triagem completa, falta a visita." })],
+        NINGUEM_ATENDE,
+      )[0]!;
+      expect(c.manchete).toEqual({ texto: "Triagem completa, falta a visita.", traduzir: false });
+    }
+  });
+
+  it("código DECLARADO sem porquê mantém a frase dele, que ali é verdade", () => {
+    const c = montarCartoesDaPassagem(
+      [daIa({ motivo_codigo: "critical_stage", content: null })],
+      NINGUEM_ATENDE,
+    )[0]!;
+    expect(c.manchete).toEqual({ texto: FRASE_DO_MOTIVO.critical_stage, traduzir: true });
   });
 
   it("pedido EXPLÍCITO do cliente mantém a frase fixa, que ali é verdade, e o texto de quem passou fica", () => {

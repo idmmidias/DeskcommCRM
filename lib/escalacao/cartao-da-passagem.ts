@@ -208,28 +208,37 @@ export const FRASE_DA_PASSAGEM_PELA_IA = "A IA passou o atendimento para uma pes
 /**
  * [IDM] A MANCHETE DA PASSAGEM FEITA PELA IA É O QUE ELA ESCREVEU.
  *
- * `human-handoff.ts` grava toda passagem da ferramenta do modelo como
- * `requested_human`, fixo, porque a ferramenta não tem campo de motivo. A frase
- * desse código ("O cliente pediu para falar com uma pessoa") é verdade na
- * detecção de pedido explícito e falsa no resto: a IA que passa porque não tem o
- * dado do imóvel abria o cartão dizendo que o cliente pediu gente. Medido na F&M
- * em 29/09/2026: 2 de 2 passagens da ferramenta com esse código, nenhuma com
- * pedido do cliente.
+ * Na 1.52 `human-handoff.ts` gravava toda passagem da ferramenta do modelo como
+ * `requested_human`, e o cartão abria dizendo que o cliente pediu uma pessoa
+ * (F&M, 29/09/2026: 2 de 2 passagens da ferramenta, nenhum pedido do cliente).
+ * Desde o #3310 o motivo AUSENTE vira `low_confidence`, que é honesto como
+ * classificação mas, como manchete, diz "o assistente não teve confiança" para a
+ * IA que passa por desenho, depois da triagem, que é o caso de quem usa o agente
+ * como recepção.
  *
- * O `por_que` que a IA escreveu (coluna `content`) é a melhor manchete para esse
- * caso, e deixa de aparecer de novo em "Escrito por quem passou". Sem ele, uma
- * frase neutra, nunca a do pedido. Opt-out e os motivos determinísticos ficam
- * como estão: o código deles é escolhido por quem detectou, e a frase é verdade.
+ * O `por_que` que a IA escreveu (coluna `content`) é a melhor manchete nos três
+ * códigos que a ferramenta grava, e deixa de aparecer de novo em "Escrito por quem
+ * passou". Sem ele: `low_confidence` (o "não declarado" da ferramenta, que só
+ * aceita `requested_human` e `critical_stage`) vira frase neutra, e os dois
+ * códigos DECLARADOS mantêm a frase deles, que ali é verdade. Opt-out e os motivos
+ * determinísticos ficam como estão: o código deles é escolhido por quem detectou.
  */
+const MOTIVOS_DA_FERRAMENTA_DA_IA: ReadonlySet<string> = new Set([
+  "requested_human",
+  "critical_stage",
+  "low_confidence",
+]);
+
 function mancheteDe(p: PassagemDaConversa, anonimizada: boolean): MancheteDoCartao {
   const daFerramentaDaIa =
-    p.origem === "ferramenta_do_modelo" && p.motivo_codigo === "requested_human";
+    p.origem === "ferramenta_do_modelo" && MOTIVOS_DA_FERRAMENTA_DA_IA.has(p.motivo_codigo);
   if (!daFerramentaDaIa) return { texto: FRASE_DO_MOTIVO[p.motivo_codigo], traduzir: true };
   // Anonimizada nunca usa `content`: a cascata garante só o `body` reescrito.
   const escrito = anonimizada ? null : texto(p.content);
-  return escrito === null
+  if (escrito !== null) return { texto: escrito, traduzir: false };
+  return p.motivo_codigo === "low_confidence"
     ? { texto: FRASE_DA_PASSAGEM_PELA_IA, traduzir: true }
-    : { texto: escrito, traduzir: false };
+    : { texto: FRASE_DO_MOTIVO[p.motivo_codigo], traduzir: true };
 }
 
 /**
